@@ -30,7 +30,7 @@
 
 #pragma newdecls required
 
-#define PL_VER "0.8.1"
+#define PL_VER "0.8.2"
 #define PL_DESC "A complete rewrite of MGEMod by Lange"
 #define PL_URL "https://mge.me"
 
@@ -243,7 +243,6 @@ Action Command_MGEME(int client, int args)
         MC_PrintToChat(client, "{green}Author: {default}bzdmn");
         MC_PrintToChat(client, "{green}Website: {default}%s", PL_URL);
         MC_PrintToChat(client, "{green}Commands: {default}!add !remove !rank");
-        MC_PrintToChat(client, "{default}-----------------------------------------");
         return Plugin_Handled;
 }
 
@@ -282,7 +281,7 @@ Action Command_JoinClass(int client, const char[] cmd, int args)
         else
         {
                 //TF2_SetPlayerClass(client, StringToTFClass(buf));
-                //ForcePlayerSuicide(client);
+                ForcePlayerSuicide(client);
                 return Plugin_Continue;
         }
 
@@ -1500,40 +1499,25 @@ bool DHookInit()
         return true;
 }
 
+/**
+ * This hook is called every time just before a player is about to change an item
+ * in their loadout. During this time, the item entindex will be invalid (-1).
+ * Figure out which slot got changed (0 or 1, every other slot is misc/melee),
+ * and update the weapon type/clip/ammo counts.
+ */
 MRESReturn DHook_WeaponChange(Address pThis, Handle hReturn, Handle hParams)
 {
         int client = view_as<int>(pThis);
-
         int WeaponEnt = DHookGetReturn(hReturn); // :CBaseEntity
         int WeaponSlot = GetPlayerWeaponSlot(client, 0);
-
-        char WeaponName[12]; // "tf_wearable\0 = 12"
-
-        DHookGetParamString(hParams, 1, WeaponName, sizeof(WeaponName));
-
-        if (WeaponSlot < 0)
+        int WeaponSlot2 = GetPlayerWeaponSlot(client, 1);
+ 
+        if (WeaponSlot != -1 && WeaponSlot2 != -1)
         {
-                WeaponSlot = 0;
+                return MRES_Ignored;
         }
-        else if (strcmp(WeaponName, "tf_wearable") != 0) 
-        {
-                if (GetPlayerWeaponSlot(client, 1) < 0)
-                {
-                        WeaponSlot = 1;
-                }
-                else if (GetPlayerWeaponSlot(client, 2) < 0)
-                {
-                        WeaponSlot = 2;
-                }
-                else
-                {
-                        WeaponSlot = 3;
-                }
-        }
-        else
-        {
-                WeaponSlot = -1;
-        }
+        
+        WeaponSlot = WeaponSlot == -1 ? 0 : 1;
 
         Player _Player = view_as<Player>(client);
 
@@ -1542,18 +1526,20 @@ MRESReturn DHook_WeaponChange(Address pThis, Handle hReturn, Handle hParams)
                 _Player.Primary = WeaponEnt;        
                 _Player.ClipPrimary = GetEntProp(WeaponEnt, Prop_Data, "m_iClip1");
                 _Player.TypePrimary = GetEntProp(WeaponEnt, Prop_Send, "m_iPrimaryAmmoType");
-                _Player.AmmoPrimary = _Player.TypePrimary > 0 ? GetEntProp(client, Prop_Send, "m_iAmmo", _, _Player.TypePrimary) : 0;
+                _Player.AmmoPrimary = _Player.TypePrimary > 0 ? 
+                                      GetEntProp(client, Prop_Send, "m_iAmmo", _, _Player.TypePrimary) : 0;
         }
         else if (WeaponSlot == 1)
         {
                 _Player.Secondary = WeaponEnt;
                 _Player.ClipSecondary = GetEntProp(WeaponEnt, Prop_Data, "m_iClip1");
                 _Player.TypeSecondary = GetEntProp(WeaponEnt, Prop_Send, "m_iPrimaryAmmoType");
-                _Player.AmmoSecondary = _Player.TypeSecondary > 0 ? GetEntProp(client, Prop_Send, "m_iAmmo", _, _Player.TypeSecondary) : 0;
+                _Player.AmmoSecondary = _Player.TypeSecondary > 0 ? 
+                                        GetEntProp(client, Prop_Send, "m_iAmmo", _, _Player.TypeSecondary) : 0;
         }
 
 #if defined _DEBUG
-        //PrintToChat(client, "DHook_WeaponChange %i %i %s", WeaponEnt, WeaponSlot, WeaponName);
+        PrintToChat(client, "DHook_WeaponChange %i %i", WeaponEnt, WeaponSlot);
 #endif
         return MRES_Ignored;
 }
