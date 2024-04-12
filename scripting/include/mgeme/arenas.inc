@@ -437,6 +437,32 @@ methodmap Arena < Handle
                 }
         }
 
+        public int Opponent(int client)
+        {
+                if (this.OpponentTeam(client) == TFTeam_Red)
+                {
+                        if (view_as<Player>(this.REDPlayer1).IsValid)
+                        {
+                                return this.REDPlayer1;       
+                        }
+                        else
+                        {
+                                return this.REDPlayer2;
+                        }
+                }
+                else
+                {
+                        if (view_as<Player>(this.BLUPlayer1).IsValid)
+                        {
+                                return this.BLUPlayer1;
+                        }
+                        else
+                        {
+                                return this.BLUPlayer2;
+                        }
+                }
+        }
+
         public int Opponent1(int client)
         {
                 if (client == this.BLUPlayer1 || client == this.BLUPlayer2)
@@ -663,6 +689,22 @@ methodmap Arena < Handle
                 public set(int newScore)
                 {
                         Arenas[view_as<int>(this)].REDScore = newScore;
+                }
+        }
+
+        property int WinnerScore
+        {
+                public get()
+                {
+                        return this.REDScore > this.BLUScore ? this.REDScore : this.BLUScore;
+                }
+        }
+
+        property int LoserScore
+        {
+                public get()
+                {
+                        return this.REDScore < this.BLUScore ? this.REDScore : this.BLUScore;
                 }
         }
 

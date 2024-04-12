@@ -95,9 +95,8 @@ public void OnMapInit(const char[] mapName)
 public void OnMapStart()
 {
         PrecacheSound(SPAWN_SOUND, true);
-        SetConVarInt(FindConVar("mp_disable_respawn_times"), 1);
+        //SetConVarInt(FindConVar("mp_disable_respawn_times"), 1);
         SetConVarInt(FindConVar("mp_autoteambalance"), 0);
-        SetConVarInt(FindConVar("mp_defaultteam"), 1);
 }
 
 public void OnClientConnected(int client)
@@ -501,18 +500,20 @@ int CalcEloChange(Arena arena)
         else BluKFactor = 8.0;
 */
         // Handle early leavers.
+        int RedFrags = arena.REDScore, BluFrags = arena.BLUScore;
+
         if (arena.REDScore > arena.BLUScore && arena.REDScore < arena.FragLimit)
         {
-                arena.REDScore = arena.FragLimit;
+                RedFrags = arena.FragLimit;
         }
         else if (arena.BLUScore > arena.REDScore && arena.BLUScore < arena.FragLimit)
         {
-                arena.BLUScore = arena.FragLimit;
+                BluFrags = arena.FragLimit;
         }
 
         float NumRounds = (float(arena.REDScore) + float(arena.BLUScore)) / 1.5;
-        float RedScore = float(arena.REDScore) / NumRounds;
-        float BluScore = float(arena.BLUScore) / NumRounds;
+        float RedScore = float(RedFrags) / NumRounds;
+        float BluScore = float(BluFrags) / NumRounds;
            
         // A negative rating change doesn't mean losing, it just means that
         // the player under-performed relative to their expected score.
@@ -642,6 +643,17 @@ void MatchOver(Arena arena, int client)
 
         if (arena.OpponentScore(client) > arena.EarlyLeave)
         {
+                if (!arena.FourPlayer)
+                {
+                        char loser[32], winner[32];
+                        GetClientName(arena.Opponent(client), winner, sizeof(winner));
+                        GetClientName(client, loser, sizeof(loser));
+
+                        MC_PrintToChatAll("{olive}%s {default}defeats {olive}%s \
+                                           {default}in {olive}%i {default}to {olive}%i",
+                                          winner, loser, arena.WinnerScore, arena.LoserScore);
+                }
+
                 ScoreWinners(arena.OpponentTeam(client), arena);
         }
 
@@ -699,7 +711,7 @@ void UpdateHUD(Arena arena, int client, bool updateEverything = true, bool updat
                              arena.RedScoreOffset : arena.BluScoreOffset ;
                 
                 Format(scores, sizeof(scores), "\n %i\n %i", arena.BLUScore, arena.REDScore);
-                SetHudTextParams(float(offset) * 0.089, 0.01, 99999.9, 255, 255, 255, 125);
+                SetHudTextParams(float(offset) * 0.093, 0.01, 99999.9, 255, 255, 255, 125);
         }
 
         ShowSyncHudText(client, HUDScore, "%s", scores);
@@ -966,7 +978,7 @@ int ArenaSelectMenuHandler(Menu menu, MenuAction action, int param1, int param2)
  * TIMER FUNCTIONS
  * =============================================================================
  */
-
+/*
 public Action Timer_Teleport(Handle timer, int serial)
 {
         int client = GetClientFromSerial(serial);
@@ -1006,6 +1018,18 @@ public Action Timer_Teleport(Handle timer, int serial)
                 _Player.Teleport(xyz, angles);
 
                 UpdateHUD(_Arena, client);
+        }
+
+        return Plugin_Stop;
+}
+*/
+public Action Timer_Respawn(Handle timer, int serial)
+{
+        int client = GetClientFromSerial(serial);
+
+        if (client > 0)
+        {
+                RequestFrame(SpawnNextFrame, client);
         }
 
         return Plugin_Stop;
@@ -1159,6 +1183,8 @@ public Action Event_PlayerDeath(Event ev, const char[] name, bool dontBroadcast)
                 {
                         _Arena.BLUScore = _Arena.BLUScore + 1;
                 }
+
+                UpdateSpectatorHUDs(_Arena);
                 
                 Player Opp1 = view_as<Player>(_Arena.Opponent1(client)),
                        Opp2 = view_as<Player>(_Arena.Opponent2(client)),
@@ -1199,7 +1225,8 @@ public Action Event_PlayerDeath(Event ev, const char[] name, bool dontBroadcast)
                 }
         }
 
-        RequestFrame(SpawnNextFrame, client);
+        CreateTimer(_Arena.RespawnTime, Timer_Respawn, GetClientSerial(client));
+        //RequestFrame(SpawnNextFrame, client);
         
         return Plugin_Continue;
 }
@@ -1215,7 +1242,35 @@ public Action Event_PlayerSpawn(Event ev, const char[] name, bool dontBroadcast)
 
         _Player.RefreshHP(_Arena.HPRatio);
 
-        CreateTimer(_Arena.RespawnTime, Timer_Teleport, GetClientSerial(client));
+        float xyz[3], angles[3];
+
+        if (_Arena.MatchOngoing())
+        {
+                float Coords[3];
+                Player Opp1 = view_as<Player>(_Arena.Opponent1(client));
+                Player Opp2 = view_as<Player>(_Arena.Opponent2(client));
+
+                if (Opp1.IsValid)
+                {       
+                        Opp1.GetCoords(Coords); 
+                }
+                else
+                {
+                        Opp2.GetCoords(Coords);
+                }
+
+                _Arena.GetFarSpawn(xyz, angles, Coords);
+        }
+        else
+        {
+                _Arena.GetRandomSpawn(xyz, angles);
+        }
+
+        _Player.Teleport(xyz, angles);
+        
+        UpdateHUD(_Arena, client);
+
+        //CreateTimer(_Arena.RespawnTime, Timer_Teleport, GetClientSerial(client));
 
         return Plugin_Continue;
 }
