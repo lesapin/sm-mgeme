@@ -1,0 +1,6 @@
+/ Spawn system 					-- DONE
+/ Replenish HP in 2v2 				-- DONE
+/ DB plugin
+	/ Storing player Elo/wins/losses
+	/ Storing match history
+/ Show remaining HP 				-- DONE
