@@ -282,7 +282,7 @@ Action Command_JoinClass(int client, const char[] cmd, int args)
         else
         {
                 //TF2_SetPlayerClass(client, StringToTFClass(buf));
-                //ForcePlayerSuicide(client);
+                ForcePlayerSuicide(client);
                 return Plugin_Continue;
         }
 
