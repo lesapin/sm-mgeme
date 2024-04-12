@@ -30,7 +30,7 @@
 
 #pragma newdecls required
 
-#define PL_VER "0.8.2"
+#define PL_VER "0.8.3"
 #define PL_DESC "A complete rewrite of MGEMod by Lange"
 #define PL_URL "https://mge.me"
 
@@ -1521,7 +1521,7 @@ MRESReturn DHook_WeaponChange(Address pThis, Handle hReturn, Handle hParams)
 
         Player _Player = view_as<Player>(client);
 
-        if (WeaponSlot == 0)
+        if (WeaponSlot == 0 && HasEntProp(WeaponEnt, Prop_Data, "m_iClip1"))
         {
                 _Player.Primary = WeaponEnt;        
                 _Player.ClipPrimary = GetEntProp(WeaponEnt, Prop_Data, "m_iClip1");
@@ -1529,7 +1529,7 @@ MRESReturn DHook_WeaponChange(Address pThis, Handle hReturn, Handle hParams)
                 _Player.AmmoPrimary = _Player.TypePrimary > 0 ? 
                                       GetEntProp(client, Prop_Send, "m_iAmmo", _, _Player.TypePrimary) : 0;
         }
-        else if (WeaponSlot == 1)
+        else if (WeaponSlot == 1 && HasEntProp(WeaponEnt, Prop_Data, "m_iClip1"))
         {
                 _Player.Secondary = WeaponEnt;
                 _Player.ClipSecondary = GetEntProp(WeaponEnt, Prop_Data, "m_iClip1");
