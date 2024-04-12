@@ -1,0 +1,23 @@
+"Games"
+{
+    "tf"
+    {
+        "Offsets"
+        {
+            // ../shared/basecombatweapon_shared.h
+            "CBaseCombatWeapon::GetSlot"
+            {
+                "linux"     "339"
+            }
+        }
+        "Signatures"
+        {
+            // ../server/tf/tf_player.h
+            "CTFPlayer::GiveNamedItem"
+            {
+                "library"   "server"
+                "linux"     "@_ZN9CTFPlayer13GiveNamedItemEPKciPK13CEconItemViewb"
+            }
+        }
+    }
+}
