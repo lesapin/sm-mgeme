@@ -711,7 +711,7 @@ void UpdateHUD(Arena arena, int client, bool updateEverything = true, bool updat
                              arena.RedScoreOffset : arena.BluScoreOffset ;
                 
                 Format(scores, sizeof(scores), "\n %i\n %i", arena.BLUScore, arena.REDScore);
-                SetHudTextParams(float(offset) * 0.093, 0.01, 99999.9, 255, 255, 255, 125);
+                SetHudTextParams(float(offset) * 0.0093, 0.01, 99999.9, 255, 255, 255, 125);
         }
 
         ShowSyncHudText(client, HUDScore, "%s", scores);
