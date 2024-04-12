@@ -22,6 +22,7 @@
 
 #pragma semicolon 1
 
+#include <sourcemod>
 #include <dhooks>
 #include <morecolors>
 #include <mgeme/players>
@@ -31,7 +32,7 @@
 
 #define PL_VER "0.8.1"
 #define PL_DESC "A complete rewrite of MGEMod by Lange"
-#define PL_URL "https://mge.me/source/"
+#define PL_URL "https://mge.me"
 
 public Plugin myinfo =
 {
@@ -46,7 +47,7 @@ public Plugin myinfo =
 #define GAMEDATA "mgeme.plugin"
 #define NAMED_ITEM "CTFPlayer::GiveNamedItem"
 
-#define ADD_USAGE "!add <arenaid> <fraglimit> <1/2 : 1v1/2v2> <1/0 : Elo/NoElo>" 
+#define ADD_USAGE "Usage: add < arenaid > < fraglimit > < 1/2 : 1v1/2v2 > < 1/0 : Elo/NoElo >" 
 
 Handle HUDScore,
        HUDArena;
@@ -108,6 +109,7 @@ public void OnClientPutInServer(int client)
 {
         TF2_ChangeClientTeam(client, TFTeam_Spectator);
         CreateTimer(10.0, Timer_WelcomeMsg1, GetClientSerial(client));
+        CreateTimer(7.0, Timer_Warning, GetClientSerial(client));
 }
 
 public void OnClientDisconnect(int client)
@@ -191,7 +193,7 @@ Action Command_Add(int _client, int args)
                                 _Arena.FourPlayer = FourPlayer > 1 ? true : false;
                                 _Arena.FragLimit = FragLimit > 0 ? FragLimit : _Arena.FragLimit;
                         }
-                        else
+                        else if (args > 1)
                         {
                                 ReplyToCommand(client, "Arena is not empty");
                                 return Plugin_Handled;
@@ -508,15 +510,15 @@ int CalcEloChange(Arena arena)
                 arena.BLUScore = arena.FragLimit;
         }
 
-        float NumRounds = float(arena.REDScore) + float(arena.BLUScore);
+        float NumRounds = (float(arena.REDScore) + float(arena.BLUScore)) / 1.5;
         float RedScore = float(arena.REDScore) / NumRounds;
-        float BluScore = 1.0 - RedScore;
+        float BluScore = float(arena.BLUScore) / NumRounds;
            
         // A negative rating change doesn't mean losing, it just means that
         // the player under-performed relative to their expected score.
-        return RoundToCeil(FloatAbs(RedScore > BluScore ? 
-               KFactor * (RedScore - RedExpectedScore) :
-               KFactor * (BluScore - BluExpectedScore)
+        return RoundToCeil(KFactor * FloatAbs(RedScore > BluScore ? 
+                                             (RedScore - RedExpectedScore) :
+                                             (BluScore - BluExpectedScore)
         ));
 }
 
@@ -697,7 +699,7 @@ void UpdateHUD(Arena arena, int client, bool updateEverything = true, bool updat
                              arena.RedScoreOffset : arena.BluScoreOffset ;
                 
                 Format(scores, sizeof(scores), "\n %i\n %i", arena.BLUScore, arena.REDScore);
-                SetHudTextParams(float(offset) * 0.01, 0.01, 99999.9, 255, 255, 255, 125);
+                SetHudTextParams(float(offset) * 0.089, 0.01, 99999.9, 255, 255, 255, 125);
         }
 
         ShowSyncHudText(client, HUDScore, "%s", scores);
@@ -1096,10 +1098,9 @@ public Action Timer_WelcomeMsg1(Handle timer, int serial)
 {       
         int client = GetClientFromSerial(serial);
 
-        if (client > 0)
+        if (client)
         {
-                MC_PrintToChat(client, "{olive}To join an arena, type {default}!add <arenaid/name>\n\
-                                        {olive}Alternatively, {default}%s", ADD_USAGE);
+                MC_PrintToChat(client, "{olive}To join an arena, type {default}!add <arenaid/name>");
                 CreateTimer(6.0, Timer_WelcomeMsg2, serial);
         }
 
@@ -1110,7 +1111,7 @@ public Action Timer_WelcomeMsg2(Handle timer, int serial)
 {
         int client = GetClientFromSerial(serial);
 
-        if (client > 0)
+        if (client)
         {
                 MC_PrintToChat(client, "{olive}MGEME %s {default}| {green}!mgeme {default}for help", PL_VER);
         }
@@ -1118,6 +1119,19 @@ public Action Timer_WelcomeMsg2(Handle timer, int serial)
         return Plugin_Stop;
 }
 
+public Action Timer_Warning(Handle timer, int serial)
+{
+        int client = GetClientFromSerial(serial);
+
+        if (client)
+        {
+                MC_PrintToChat(client, "{yellow}[SERVER] We are testing a new MGE plugin over the \
+                                        weekend. If you have any feedback, please comment in the \
+                                        chat and I will look through it later on.");
+        }
+
+        return Plugin_Stop;
+}
 
 /**
  * =============================================================================
@@ -1187,7 +1201,7 @@ public Action Event_PlayerDeath(Event ev, const char[] name, bool dontBroadcast)
 
         RequestFrame(SpawnNextFrame, client);
         
-        return Plugin_Handled;
+        return Plugin_Continue;
 }
 
 public Action Event_PlayerSpawn(Event ev, const char[] name, bool dontBroadcast)
