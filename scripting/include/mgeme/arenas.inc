@@ -364,6 +364,7 @@ methodmap Arena < Handle
 
                 Arenas[index].FourPlayerDefault = Arenas[index].FourPlayer;
                 Arenas[index].FragLimitDefault = Arenas[index].FragLimit;
+                Arenas[index].EloEnabled = true;
 
                 return view_as<Arena>(index);
         }

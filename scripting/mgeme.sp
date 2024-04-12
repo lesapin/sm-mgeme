@@ -277,12 +277,13 @@ Action Command_JoinClass(int client, const char[] cmd, int args)
 
         if (!_Arena.IsClassAllowed(StringToTFClass(buf)))
         {
-                PrintToChat(client, "%s is not allowed in this arena", buf);
+                MC_PrintToChat(client, "{olive}%s {default}is not allowed in this arena", buf);
         }
         else
         {
-                TF2_SetPlayerClass(client, StringToTFClass(buf));
-                ForcePlayerSuicide(client);
+                //TF2_SetPlayerClass(client, StringToTFClass(buf));
+                //ForcePlayerSuicide(client);
+                return Plugin_Continue;
         }
 
         return Plugin_Handled;
@@ -1151,7 +1152,7 @@ public Action Timer_Warning(Handle timer, int serial)
         {
                 MC_PrintToChat(client, "{yellow}[SERVER] We are testing a new MGE plugin over the \
                                         weekend. If you have any feedback, please comment in the \
-                                        chat and I will look through it later on.");
+                                        chat and I will look through it in the logs later on.");
         }
 
         return Plugin_Stop;
