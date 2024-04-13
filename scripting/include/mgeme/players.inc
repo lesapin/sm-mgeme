@@ -20,6 +20,15 @@
  *
  */
 
+#include <clientprefs>
+               
+Handle SettingsCki,
+       FourPlayerCki, 
+       EloCki, 
+       FragLimitCki;
+
+Panel FragLimitPanel;
+
 #define MAX_PLAYERS 24
 #define SPAWN_SOUND "items/spawn_item.wav"
 
@@ -242,6 +251,37 @@ methodmap Player < Handle
                 {
                         Players[view_as<int>(this)].Losses = losses;
                 }
+        }
+
+        public bool GetCookies(bool &settings, bool &fourPlayer, bool &elo, int &fraglimit)
+        {
+                int client = view_as<int>(this);
+
+                if (AreClientCookiesCached(client))
+                {
+                        char buf[16];
+
+                        GetClientCookie(client, SettingsCki, buf, sizeof(buf));
+                        settings = strcmp(buf, "on") == 0 ? true : false;
+
+                        if (!settings)
+                        {
+                                return false;
+                        }
+
+                        GetClientCookie(client, FourPlayerCki, buf, sizeof(buf));
+                        fourPlayer = strcmp(buf, "yes") == 0 ? true : false;
+
+                        GetClientCookie(client, EloCki, buf, sizeof(buf));
+                        elo = strcmp(buf, "yes") == 0 ? true : false;
+
+                        GetClientCookie(client, FragLimitCki, buf, sizeof(buf));
+                        fraglimit = StringToInt(buf);
+
+                        return true;
+                }
+
+                return false;
         }
 
         public void GetCoords(float xyz[3])

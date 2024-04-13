@@ -28,7 +28,7 @@
 #include <tf2>
 #include <tf2_stocks>
 
-#define MAX_ARENAS 65
+#define MAX_ARENAS 20
 #define MAX_SPAWNS 15
 
 #define ARENA_NAME_LEN 64
@@ -1142,7 +1142,10 @@ methodmap Arena < Handle
 #if defined _DEBUG
                 PrintToChat(client, "Removed from spectator list %i", view_as<int>(this));
 #endif
-                this.SpectatorList.Delete(GetClientSerial(client));
+                if (client)
+                {
+                        this.SpectatorList.Delete(GetClientSerial(client));
+                }
         }
 }
 
@@ -1188,10 +1191,17 @@ stock bool LoadMapConfig(const char[] file, const char[] mapname)
                                 ArenaList[ArenaIndex] = parsed;
                                 ArenaIndex++;
                         }
+
+                        if (ArenaIndex > MAX_ARENAS)
+                        {
+                                LogError("MAX_ARENAS is %i, couldn't parse every arena in %s", 
+                                          MAX_ARENAS, mapname);
+                                break;
+                        }
                 } 
                 while (kv.GotoNextKey())
 
-                NumArenas = ArenaIndex;
+                NumArenas = ArenaIndex - 1;
         }
 
         delete kv;
@@ -1372,7 +1382,7 @@ static int ClassesToBinary(const char[] str)
  */
 stock int StringToArenaIdx(const char[] str)
 {
-        for (int i = 1; i < NumArenas; i++)
+        for (int i = 1; i <= NumArenas; i++)
         {
                 char buf[64];
                 ArenaList[i].GetName(buf, sizeof(buf));

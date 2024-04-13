@@ -30,7 +30,7 @@
 
 #pragma newdecls required
 
-#define PL_VER "0.8.3"
+#define PL_VER "0.8.5"
 #define PL_DESC "A complete rewrite of MGEMod by Lange"
 #define PL_URL "https://mge.me"
 
@@ -50,7 +50,8 @@ public Plugin myinfo =
 #define ADD_USAGE "Usage: add < arenaid > < fraglimit > < 1/2 : 1v1/2v2 > < 1/0 : Elo/NoElo >" 
 
 Handle HUDScore,
-       HUDArena;
+       HUDArena,
+       HUDBanner;
 
 /**
  * =============================================================================
@@ -60,6 +61,11 @@ Handle HUDScore,
 
 public void OnPluginStart()
 {
+        if (MaxClients > MAX_PLAYERS)
+        {
+                SetFailState("MaxClients is %i. See 'players.inc'", MAX_PLAYERS);
+        }
+
 #if defined _DEBUG
         RegAdminCmd("runtests", Admin_Command_RunTests, 1, "Run test set.");
         RegAdminCmd("fakeclients", Admin_Command_CreateFakeClients, 1, "Spawn fake clients.");
@@ -67,6 +73,7 @@ public void OnPluginStart()
         RegConsoleCmd("add", Command_Add, "Usage: add <arena number/arena name>. Join an arena.");
         RegConsoleCmd("remove", Command_Remove, "Leave the current arena or queue.");
         RegConsoleCmd("rank", Command_Rank, "View your rating and wins/losses.");
+        RegConsoleCmd("settings", Command_Settings, "Arena preferences.");
         RegConsoleCmd("mgeme", Command_MGEME, "Display plugin information.");
 
         HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre);
@@ -83,6 +90,25 @@ public void OnPluginStart()
 
         HUDScore = CreateHudSynchronizer();
         HUDArena = CreateHudSynchronizer();
+        HUDBanner = CreateHudSynchronizer();
+
+        SettingsCki = RegClientCookie("Settings", "Use settings", CookieAccess_Public);
+        FourPlayerCki = RegClientCookie("2v2", "Enable 2v2 mode", CookieAccess_Public);
+        EloCki = RegClientCookie("Elo", "Enable Elo", CookieAccess_Public);
+        FragLimitCki = RegClientCookie("FragLimit", "Use custom fraglimit", CookieAccess_Public);
+        
+        SetCookiePrefabMenu(SettingsCki, CookieMenu_OnOff, "Use Settings");
+        SetCookiePrefabMenu(FourPlayerCki, CookieMenu_YesNo, "Enable 2v2 Mode");
+        SetCookiePrefabMenu(EloCki, CookieMenu_YesNo, "Enable Elo");
+        SetCookieMenuItem(SettingsCookieMenuHandler, 20, "Set Fraglimit");
+
+        FragLimitPanel = new Panel();
+        FragLimitPanel.SetTitle("Select a Fraglimit");
+        FragLimitPanel.DrawItem("10");
+        FragLimitPanel.DrawItem("20");
+        FragLimitPanel.DrawItem("30");
+        FragLimitPanel.DrawItem("40");
+        FragLimitPanel.DrawItem("50");
 
         DHookInit();
 }
@@ -133,7 +159,7 @@ Action Command_Add(int _client, int args)
 
                 int ArenaIdx = GetCmdArgInt(1);
 
-                if (ArenaIdx > 0 && ArenaIdx < NumArenas)
+                if (ArenaIdx > 0 && ArenaIdx <= NumArenas)
                 {
 #if defined _DEBUG
                         if (args == 2)
@@ -236,13 +262,23 @@ Action Command_Rank(int client, int args)
         return Plugin_Handled;
 }
 
+Action Command_Settings(int client, int args)
+{
+        if (args == 0)
+        {
+                ShowCookieMenu(client);
+        }
+
+        return Plugin_Handled;
+}
+
 Action Command_MGEME(int client, int args)
 {
         MC_PrintToChat(client, "{green}MGEME {default}Version %s\n%s", PL_VER, PL_DESC);
         MC_PrintToChat(client, "{default}-----------------------------------------");
         MC_PrintToChat(client, "{green}Author: {default}bzdmn");
         MC_PrintToChat(client, "{green}Website: {default}%s", PL_URL);
-        MC_PrintToChat(client, "{green}Commands: {default}!add !remove !rank");
+        MC_PrintToChat(client, "{green}Commands: {default}!add !remove !rank !settings");
         return Plugin_Handled;
 }
 
@@ -281,7 +317,7 @@ Action Command_JoinClass(int client, const char[] cmd, int args)
         else
         {
                 //TF2_SetPlayerClass(client, StringToTFClass(buf));
-                ForcePlayerSuicide(client);
+                //ForcePlayerSuicide(client);
                 return Plugin_Continue;
         }
 
@@ -348,7 +384,7 @@ void ShowArenaSelectMenu(int client)
         char name[64];
         char intstr[4];
 
-        for (int i = 1; i < NumArenas; i++)
+        for (int i = 1; i <= NumArenas; i++)
         {
                 Arena _Arena = view_as<Arena>(i); 
                 _Arena.GetName(name, sizeof(name));
@@ -487,8 +523,6 @@ int CalcEloChange(Arena arena)
         PrintToChatAll("Red expected score: %0.2f", RedExpectedScore);
         PrintToChatAll("Blu expected score: %0.2f", BluExpectedScore);
 #endif
-        float KFactor = 16.0;           // Universal K-factor.
-/*      
         float RedKFactor, BluKFactor;   // Variable K-factor.
 
         if (arena.REDElo < 2100) RedKFactor = 16.0;
@@ -498,7 +532,10 @@ int CalcEloChange(Arena arena)
         if (arena.BLUElo < 2100) BluKFactor = 16.0;
         else if (arena.BLUElo < 2400) BluKFactor = 12.0;
         else BluKFactor = 8.0;
-*/
+
+        //float KFactor = 16.0;           // Universal K-factor.
+        float KFactor = BluKFactor < RedKFactor ? BluKFactor : RedKFactor;
+
         // Handle early leavers.
         int RedFrags = arena.REDScore, BluFrags = arena.BLUScore;
 
@@ -715,6 +752,9 @@ void UpdateHUD(Arena arena, int client, bool updateEverything = true, bool updat
         }
 
         ShowSyncHudText(client, HUDScore, "%s", scores);
+
+        SetHudTextParams(0.65, 0.95, 99999.9, 60, 238, 255, 255);
+        ShowSyncHudText(client, HUDBanner, "mge.me");
 }
 
 void UpdateSpectatorHUDs(Arena arena, bool updateEverything = false)
@@ -967,6 +1007,44 @@ int ArenaSelectMenuHandler(Menu menu, MenuAction action, int param1, int param2)
                 case MenuAction_End:
                 {
                         delete menu;
+                }
+        }
+
+        return 0;
+}
+
+void SettingsCookieMenuHandler(int client, CookieMenuAction action, any info, char[] buf, int maxlen)
+{
+        switch (action)
+        {
+                case CookieMenuAction_DisplayOption:
+                {
+                        //PrintToChat(client, "Display %s", buf);
+                }
+
+                case CookieMenuAction_SelectOption:
+                {
+                        //PrintToChat(client, "Selected %i", info);
+                        FragLimitPanel.Send(client, FragLimitPanelHandler, MENU_TIME_FOREVER);
+                }
+        }
+}
+
+int FragLimitPanelHandler(Menu menu, MenuAction action, int param1, int param2)
+{
+        switch (action)
+        {
+                case MenuAction_Select:
+                {
+                        //PrintToChat(param1, "Selected item %i", param2);
+                        char buf[8];
+                        IntToString(param2 * 10, buf, sizeof(buf));
+                        SetClientCookie(param1, FragLimitCki, buf);
+                }
+
+                case MenuAction_Cancel:
+                {
+                        ShowCookieMenu(param1);
                 }
         }
 
@@ -1521,23 +1599,36 @@ MRESReturn DHook_WeaponChange(Address pThis, Handle hReturn, Handle hParams)
 
         Player _Player = view_as<Player>(client);
 
-        if (WeaponSlot == 0 && HasEntProp(WeaponEnt, Prop_Data, "m_iClip1"))
+        if (HasEntProp(WeaponEnt, Prop_Data, "m_iClip1"))
         {
-                _Player.Primary = WeaponEnt;        
-                _Player.ClipPrimary = GetEntProp(WeaponEnt, Prop_Data, "m_iClip1");
-                _Player.TypePrimary = GetEntProp(WeaponEnt, Prop_Send, "m_iPrimaryAmmoType");
-                _Player.AmmoPrimary = _Player.TypePrimary > 0 ? 
+                if (WeaponSlot == 0)
+                {
+                        _Player.Primary = WeaponEnt;        
+                        _Player.ClipPrimary = GetEntProp(WeaponEnt, Prop_Data, "m_iClip1");
+                        _Player.TypePrimary = GetEntProp(WeaponEnt, Prop_Send, "m_iPrimaryAmmoType");
+                        _Player.AmmoPrimary = _Player.TypePrimary > 0 ? 
                                       GetEntProp(client, Prop_Send, "m_iAmmo", _, _Player.TypePrimary) : 0;
-        }
-        else if (WeaponSlot == 1 && HasEntProp(WeaponEnt, Prop_Data, "m_iClip1"))
-        {
-                _Player.Secondary = WeaponEnt;
-                _Player.ClipSecondary = GetEntProp(WeaponEnt, Prop_Data, "m_iClip1");
-                _Player.TypeSecondary = GetEntProp(WeaponEnt, Prop_Send, "m_iPrimaryAmmoType");
-                _Player.AmmoSecondary = _Player.TypeSecondary > 0 ? 
+                }
+                else if (WeaponSlot == 1)
+                {
+                        _Player.Secondary = WeaponEnt;
+                        _Player.ClipSecondary = GetEntProp(WeaponEnt, Prop_Data, "m_iClip1");
+                        _Player.TypeSecondary = GetEntProp(WeaponEnt, Prop_Send, "m_iPrimaryAmmoType");
+                        _Player.AmmoSecondary = _Player.TypeSecondary > 0 ? 
                                         GetEntProp(client, Prop_Send, "m_iAmmo", _, _Player.TypeSecondary) : 0;
+                }
         }
-
+        else
+        {
+                if (WeaponSlot == 0)
+                {
+                        _Player.Primary = -1;
+                }
+                else if (WeaponSlot ==  1)
+                {
+                        _Player.Secondary = -1;
+                }
+        }
 #if defined _DEBUG
         PrintToChat(client, "DHook_WeaponChange %i %i", WeaponEnt, WeaponSlot);
 #endif
