@@ -30,7 +30,7 @@
 
 #pragma newdecls required
 
-#define PL_VER "0.8.5"
+#define PL_VER "0.8.6"
 #define PL_DESC "A complete rewrite of MGEMod by Lange"
 #define PL_URL "https://mge.me"
 
@@ -79,6 +79,7 @@ public void OnPluginStart()
         HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre);
         HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Pre);
         HookEvent("player_team", Event_PlayerTeam, EventHookMode_Pre);
+        HookEvent("player_class", Event_PlayerClass_Post, EventHookMode_Post);
         HookEvent("teamplay_round_start", Event_RoundStart_Post, EventHookMode_Post);
         HookEvent("teamplay_team_ready", Event_TeamReady_Post, EventHookMode_Post);
         HookEvent("teamplay_round_win", Event_RoundWin_Post, EventHookMode_Post);
@@ -274,11 +275,10 @@ Action Command_Settings(int client, int args)
 
 Action Command_MGEME(int client, int args)
 {
-        MC_PrintToChat(client, "{green}MGEME {default}Version %s\n%s", PL_VER, PL_DESC);
-        MC_PrintToChat(client, "{default}-----------------------------------------");
-        MC_PrintToChat(client, "{green}Author: {default}bzdmn");
-        MC_PrintToChat(client, "{green}Website: {default}%s", PL_URL);
-        MC_PrintToChat(client, "{green}Commands: {default}!add !remove !rank !settings");
+        MC_PrintToChat(client, "{green}MGEME {default}Version %s\n{olive}%s", PL_VER, PL_DESC);
+        MC_PrintToChat(client, "{green}Author: {olive}bzdmn");
+        MC_PrintToChat(client, "{green}Website: {olive}%s", PL_URL);
+        MC_PrintToChat(client, "{green}Commands: {olive}!add !remove !rank");
         return Plugin_Handled;
 }
 
@@ -589,28 +589,28 @@ void ScoreWinners(TFTeam winningTeam, Arena arena)
                 {
                         Red1.Wins = Red1.Wins + 1;
                         Red1.Elo = Red1.Elo + EloDiff;
-                        MC_PrintToChat(arena.REDPlayer1, "{olive}You gained %i Elo", EloDiff);
+                        MC_PrintToChat(arena.REDPlayer1, "{green}[MGE] {default}You gained %i Elo", EloDiff);
                 }
                 
                 if (Red2.IsValid) 
                 {
                         Red2.Wins = Red2.Wins + 1;
                         Red2.Elo = Red2.Elo + EloDiff;
-                        MC_PrintToChat(arena.REDPlayer2, "{olive}You gained %i Elo", EloDiff);
+                        MC_PrintToChat(arena.REDPlayer2, "{green}[MGE] {default}You gained %i Elo", EloDiff);
                 }
 
                 if (Blu1.IsValid) 
                 {
                         Blu1.Losses = Blu1.Losses + 1;
                         Blu1.Elo = Blu1.Elo - EloDiff;
-                        MC_PrintToChat(arena.BLUPlayer1, "{olive}You lost %i Elo", EloDiff);
+                        MC_PrintToChat(arena.BLUPlayer1, "{green}[MGE] {default}You lost %i Elo", EloDiff);
                 }
 
                 if (Blu2.IsValid) 
                 {
                         Blu2.Losses = Blu2.Losses + 1;
                         Blu2.Elo = Blu2.Elo - EloDiff;
-                        MC_PrintToChat(arena.BLUPlayer2, "{olive}You lost %i Elo", EloDiff);
+                        MC_PrintToChat(arena.BLUPlayer2, "{green}[MGE] {default}You lost %i Elo", EloDiff);
                 }
         }
         else
@@ -682,13 +682,13 @@ void MatchOver(Arena arena, int client)
         {
                 if (!arena.FourPlayer)
                 {
-                        char loser[32], winner[32];
+                        char loser[32], winner[32], name[64];
                         GetClientName(arena.Opponent(client), winner, sizeof(winner));
                         GetClientName(client, loser, sizeof(loser));
+                        arena.GetName(name, sizeof(name));
 
-                        MC_PrintToChatAll("{olive}%s {default}defeats {olive}%s \
-                                           {default}in {olive}%i {default}to {olive}%i",
-                                          winner, loser, arena.WinnerScore, arena.LoserScore);
+                        MC_PrintToChatAll("{green}%s (%i) {olive}defeats {green}%s (%i) {olive}in %s",
+                                          winner, arena.WinnerScore, loser, arena.LoserScore, name);
                 }
 
                 ScoreWinners(arena.OpponentTeam(client), arena);
@@ -707,7 +707,10 @@ void MatchOver(Arena arena, int client)
  */
 void UpdateHUD(Arena arena, int client, bool updateEverything = true, bool updateScores = true)
 {
-        if (!client) return;
+        if (!client) 
+        {
+                return;
+        }
 
         if (!arena.IsValid)
         {
@@ -724,10 +727,16 @@ void UpdateHUD(Arena arena, int client, bool updateEverything = true, bool updat
                 {
                         DrawHUD(arena, hud, sizeof(hud));
                         arena.SetHUD(hud);
+#if defined _DEBUG
+                        PrintToChat(client, "set hud %s", hud);
+#endif
                 }
                 else
                 {
                         arena.GetHUD(hud, sizeof(hud));
+#if defined _DEBUG
+                        PrintToChat(client, "got hud %s", hud);
+#endif
                 }
 
                 if (updateScores) 
@@ -792,22 +801,22 @@ void UpdateArenaHUDs(Arena arena)
 
         if (Red1.IsValid)
         {
-                UpdateHUD(arena, arena.REDPlayer1);
+                UpdateHUD(arena, arena.REDPlayer1, true, false);
         }
         
         if (Red2.IsValid)
         {
-                UpdateHUD(arena, arena.REDPlayer2);
+                UpdateHUD(arena, arena.REDPlayer2, true, false);
         }
         
         if (Blu1.IsValid)
         {
-                UpdateHUD(arena, arena.BLUPlayer1);
+                UpdateHUD(arena, arena.BLUPlayer1, true, false);
         }
 
         if (Blu2.IsValid)
         {
-                UpdateHUD(arena, arena.BLUPlayer2);
+                UpdateHUD(arena, arena.BLUPlayer2, true, false);
         }
 
         if (arena.NumSpectators > 0)
@@ -941,6 +950,12 @@ void SpectateNextFrame(int client)
         {
                 ClearHUD(client);
         }
+}
+
+void UpdateHUDNextFrame(int client)
+{
+        Player _Player = view_as<Player>(client);
+        UpdateHUD(view_as<Arena>(_Player.ArenaIdx), client);
 }
 
 /**
@@ -1202,7 +1217,7 @@ public Action Timer_WelcomeMsg1(Handle timer, int serial)
 
         if (client)
         {
-                MC_PrintToChat(client, "{olive}To join an arena, type {default}!add <arenaid/name>");
+                MC_PrintToChat(client, "{olive}To join an arena, type {green}!add <arenaid/name>");
                 CreateTimer(6.0, Timer_WelcomeMsg2, serial);
         }
 
@@ -1215,7 +1230,7 @@ public Action Timer_WelcomeMsg2(Handle timer, int serial)
 
         if (client)
         {
-                MC_PrintToChat(client, "{olive}MGEME %s {default}| {green}!mgeme {default}for help", PL_VER);
+                MC_PrintToChat(client, "{olive}MGEME %s | {green}!mgeme {olive}for help", PL_VER);
         }
 
         return Plugin_Stop;
@@ -1292,10 +1307,14 @@ public Action Event_PlayerDeath(Event ev, const char[] name, bool dontBroadcast)
                                 Opp2.RefreshAmmo();
                         }
                 }
-
+/*
                 if (Opp1.IsValid) UpdateHUD(_Arena, _Arena.Opponent1(client), false, true);
                 if (Opp2.IsValid) UpdateHUD(_Arena, _Arena.Opponent2(client), false, true);
                 if (Ally.IsValid) UpdateHUD(_Arena, _Arena.Ally(client), false, true);
+*/
+                if (Opp1.IsValid) UpdateHUD(_Arena, _Arena.Opponent1(client));
+                if (Opp2.IsValid) UpdateHUD(_Arena, _Arena.Opponent2(client));
+                if (Ally.IsValid) UpdateHUD(_Arena, _Arena.Ally(client));
 
                 if (_Arena.REDScore >= _Arena.FragLimit || _Arena.BLUScore >= _Arena.FragLimit)
                 {
@@ -1341,10 +1360,11 @@ public Action Event_PlayerSpawn(Event ev, const char[] name, bool dontBroadcast)
                 _Arena.GetRandomSpawn(xyz, angles);
         }
 
+        UpdateHUD(_Arena, client);
+        //RequestFrame(UpdateHUDNextFrame, client);
+
         _Player.RefreshHP(_Arena.HPRatio);
         _Player.Teleport(xyz, angles);
-        
-        UpdateHUD(_Arena, client);
 
         return Plugin_Continue;
 }
@@ -1395,8 +1415,23 @@ public Action Event_PlayerTeam(Event ev, const char[] name, bool dontBroadcast)
         }
         
         UpdateHUD(_Arena, client, true, false);
+        //RequestFrame(UpdateHUDNextFrame, client);
        
         return Plugin_Handled;
+}
+
+public Action Event_PlayerClass_Post(Event ev, const char[] name, bool dontBroadcast)
+{
+        int client = GetClientOfUserId(ev.GetInt("userid"));
+#if defined _DEBUG
+        PrintToChat(client, "Event_PlayerClass_Post");
+#endif
+        Player _Player = view_as<Player>(client);
+        Arena _Arena = view_as<Arena>(_Player.ArenaIdx);
+
+        UpdateHUD(_Arena, client);
+
+        return Plugin_Continue;
 }
 
 public Action Event_RoundStart_Post(Event ev, const char[] name, bool dontBroadcast)
