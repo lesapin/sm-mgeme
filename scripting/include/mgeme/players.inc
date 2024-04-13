@@ -307,21 +307,21 @@ methodmap Player < Handle
         {
                 int client = view_as<int>(this);
                 
-                if (this.ClipPrimary > 0)
+                if (this.ClipPrimary > 0 && this.Primary > 0)
                 {
                         SetEntProp(this.Primary, Prop_Data, "m_iClip1", this.ClipPrimary);
                 }
 
-                if (this.ClipSecondary > 0)
+                if (this.ClipSecondary > 0 && this.Secondary > 0)
                 {
                         SetEntProp(this.Secondary, Prop_Data, "m_iClip1", this.ClipSecondary);
                 }
 
-                if (this.AmmoPrimary > 0)
+                if (this.AmmoPrimary > 0 && this.Primary > 0)
                 {
                         SetEntProp(client, Prop_Send, "m_iAmmo", this.AmmoPrimary, _, this.TypePrimary);
                 }
-                if (this.AmmoSecondary > 0)
+                if (this.AmmoSecondary > 0 && this.Secondary > 0)
                 {
                         SetEntProp(client, Prop_Send, "m_iAmmo", this.AmmoSecondary,_, this.TypeSecondary);
                 }

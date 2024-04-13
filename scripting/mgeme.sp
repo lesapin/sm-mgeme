@@ -716,6 +716,7 @@ void UpdateHUD(Arena arena, int client, bool updateEverything = true, bool updat
         }
 
         char hud[ARENA_HUD_SIZE];
+        char scores[32] = "";
         
         if (arena.MatchOngoing())
         {
@@ -724,14 +725,25 @@ void UpdateHUD(Arena arena, int client, bool updateEverything = true, bool updat
                         DrawHUD(arena, hud, sizeof(hud));
                         arena.SetHUD(hud);
                 }
-                else if (updateEverything)
+                else
                 {
                         arena.GetHUD(hud, sizeof(hud));
                 }
+
+                if (updateScores) 
+                {
+                        int offset = arena.RedScoreOffset > arena.BluScoreOffset ?
+                                     arena.RedScoreOffset : arena.BluScoreOffset ;
+                
+                        Format(scores, sizeof(scores), "\n %i\n %i", arena.BLUScore, arena.REDScore);
+                        SetHudTextParams(float(offset) * 0.0093, 0.01, 99999.9, 255, 255, 255, 125);
+                }
+
+                ShowSyncHudText(client, HUDScore, "%s", scores);
         }
-        else if (updateEverything)
+        else
         {
-                DrawHUD(arena, hud, sizeof(hud));        
+                DrawHUD(arena, hud, sizeof(hud));
         }
 
         if (updateEverything)
@@ -739,19 +751,6 @@ void UpdateHUD(Arena arena, int client, bool updateEverything = true, bool updat
                 SetHudTextParams(0.01, 0.01, 99999.9, 255, 255, 255, 125);
                 ShowSyncHudText(client, HUDArena, "%s", hud);
         }
-
-        char scores[32] = "";
-
-        if (updateScores && arena.MatchOngoing()) 
-        {
-                int offset = arena.RedScoreOffset > arena.BluScoreOffset ?
-                             arena.RedScoreOffset : arena.BluScoreOffset ;
-                
-                Format(scores, sizeof(scores), "\n %i\n %i", arena.BLUScore, arena.REDScore);
-                SetHudTextParams(float(offset) * 0.0093, 0.01, 99999.9, 255, 255, 255, 125);
-        }
-
-        ShowSyncHudText(client, HUDScore, "%s", scores);
 
         SetHudTextParams(0.65, 0.95, 99999.9, 60, 238, 255, 255);
         ShowSyncHudText(client, HUDBanner, "mge.me");
@@ -773,7 +772,7 @@ void UpdateSpectatorHUDs(Arena arena, bool updateEverything = false)
                 }
                 else
                 {
-                        UpdateHUD(arena, Spectator, updateEverything);
+                        UpdateHUD(arena, Spectator, true);
                 }
         }
 }
@@ -1107,7 +1106,8 @@ public Action Timer_Respawn(Handle timer, int serial)
 
         if (client > 0)
         {
-                RequestFrame(SpawnNextFrame, client);
+                TF2_RespawnPlayer(client);
+                //RequestFrame(SpawnNextFrame, client);
         }
 
         return Plugin_Stop;
@@ -1133,25 +1133,25 @@ public Action Timer_Match_Start(Handle timer, Arena arena)
         if (Red1.IsValid)
         {
                 PrintCenterText(arena.REDPlayer1, " ");
-                UpdateHUD(arena, arena.REDPlayer1, false, true);
+                UpdateHUD(arena, arena.REDPlayer1);
         }
                 
         if (Red2.IsValid) 
         {
                 PrintCenterText(arena.REDPlayer2, " ");
-                UpdateHUD(arena, arena.REDPlayer2, false, true);
+                UpdateHUD(arena, arena.REDPlayer2);
         }
                 
         if (Blu1.IsValid)
         {
                 PrintCenterText(arena.BLUPlayer1, " ");
-                UpdateHUD(arena, arena.BLUPlayer1, false, true);
+                UpdateHUD(arena, arena.BLUPlayer1);
         }
 
         if (Blu2.IsValid) 
         {
                 PrintCenterText(arena.BLUPlayer2, " ");
-                UpdateHUD(arena, arena.BLUPlayer2, false, true);
+                UpdateHUD(arena, arena.BLUPlayer2);
         }
 
         if (arena.NumSpectators > 0)
@@ -1304,7 +1304,6 @@ public Action Event_PlayerDeath(Event ev, const char[] name, bool dontBroadcast)
         }
 
         CreateTimer(_Arena.RespawnTime, Timer_Respawn, GetClientSerial(client));
-        //RequestFrame(SpawnNextFrame, client);
         
         return Plugin_Continue;
 }
@@ -1317,8 +1316,6 @@ public Action Event_PlayerSpawn(Event ev, const char[] name, bool dontBroadcast)
 #endif
         Player _Player = view_as<Player>(client);
         Arena _Arena = view_as<Arena>(_Player.ArenaIdx);
-
-        _Player.RefreshHP(_Arena.HPRatio);
 
         float xyz[3], angles[3];
 
@@ -1344,11 +1341,10 @@ public Action Event_PlayerSpawn(Event ev, const char[] name, bool dontBroadcast)
                 _Arena.GetRandomSpawn(xyz, angles);
         }
 
+        _Player.RefreshHP(_Arena.HPRatio);
         _Player.Teleport(xyz, angles);
         
         UpdateHUD(_Arena, client);
-
-        //CreateTimer(_Arena.RespawnTime, Timer_Teleport, GetClientSerial(client));
 
         return Plugin_Continue;
 }
@@ -1397,13 +1393,8 @@ public Action Event_PlayerTeam(Event ev, const char[] name, bool dontBroadcast)
                         RequestFrame(SpawnNextFrame, client);
                 }
         }
-        /*
-        else if (NewTeam == TFTeam_Spectator)
-        {       
-                RemovePlayerFromArena(client, false);
-        }*/
         
-        UpdateHUD(_Arena, client);
+        UpdateHUD(_Arena, client, true, false);
        
         return Plugin_Handled;
 }
