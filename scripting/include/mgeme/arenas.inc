@@ -1134,7 +1134,10 @@ methodmap Arena < Handle
 #if defined _DEBUG
                 PrintToChat(client, "Added to spectator list %i", view_as<int>(this));
 #endif
-                this.SpectatorList.Append(GetClientSerial(client));
+                if (client)
+                {
+                        this.SpectatorList.Append(GetClientSerial(client));
+                }
         }
 
         public void RemoveSpectator(int client)

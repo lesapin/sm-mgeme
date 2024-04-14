@@ -47,7 +47,7 @@ public Plugin myinfo =
 #define GAMEDATA "mgeme.plugin"
 #define NAMED_ITEM "CTFPlayer::GiveNamedItem"
 
-#define ADD_USAGE "!add <arena id/name> [-fraglimit <number> -noelo -2v2]" 
+#define ADD_USAGE "!add <arenaid/name> [-fraglimit <num> -noelo -2v2]" 
 #define ADD_FLAGS 3
 
 Handle HUDScore,
@@ -77,7 +77,7 @@ public void OnPluginStart()
         RegConsoleCmd("settings", Command_Settings, "Arena preferences.");
         RegConsoleCmd("mgeme", Command_MGEME, "Display plugin information.");
 
-        HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre);
+        HookEvent("player_death", Event_PlayerDeath_Post, EventHookMode_Post);
         HookEvent("player_spawn", Event_PlayerSpawn_Post, EventHookMode_Post);
         HookEvent("player_team", Event_PlayerTeam, EventHookMode_Pre);
         HookEvent("player_class", Event_PlayerClass_Post, EventHookMode_Post);
@@ -335,8 +335,8 @@ Action Command_JoinClass(int client, const char[] cmd, int args)
         }
         else
         {
-                //TF2_SetPlayerClass(client, StringToTFClass(buf));
-                //ForcePlayerSuicide(client);
+                ForcePlayerSuicide(client);
+                CreateTimer(0.3, Timer_UpdateHUDAfterRespawn, client);
                 return Plugin_Continue;
         }
 
@@ -1207,7 +1207,7 @@ public Action Timer_WelcomeMsg1(Handle timer, int serial)
 
         if (client)
         {
-                MC_PrintToChat(client, "{green}%s {olive}to join", ADD_USAGE);
+                MC_PrintToChat(client, "{olive}Type {green}%s {olive}to join", ADD_USAGE);
                 CreateTimer(6.0, Timer_WelcomeMsg2, serial);
         }
 
@@ -1246,7 +1246,7 @@ public Action Timer_Warning(Handle timer, int serial)
  * =============================================================================
  */
 
-public Action Event_PlayerDeath(Event ev, const char[] name, bool dontBroadcast)
+public Action Event_PlayerDeath_Post(Event ev, const char[] name, bool dontBroadcast)
 {
         int client = GetClientOfUserId(ev.GetInt("userid"));
         int attacker = GetClientOfUserId(ev.GetInt("attacker"));
@@ -1419,9 +1419,9 @@ public Action Event_PlayerClass_Post(Event ev, const char[] name, bool dontBroad
 #endif
         Player _Player = view_as<Player>(client);
         Arena _Arena = view_as<Arena>(_Player.ArenaIdx);
-
+ 
         //UpdateHUD(_Arena, client);
-        CreateTimer(0.3, Timer_UpdateHUDAfterRespawn, client);
+        //CreateTimer(0.3, Timer_UpdateHUDAfterRespawn, client);
 
         return Plugin_Continue;
 }

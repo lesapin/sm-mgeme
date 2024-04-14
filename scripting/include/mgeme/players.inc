@@ -49,6 +49,8 @@ enum struct PlayerInfo
         int AmmoSecondary;
         int ClipPrimary;
         int ClipSecondary;
+
+        int MaxHP;
 }
 
 static PlayerInfo Players[MAX_PLAYERS + 1]; // Indexing starts at 1.
@@ -200,6 +202,18 @@ methodmap Player < Handle
                 }
         }
 
+        property int MaxHP
+        {
+                public get()
+                {
+                        return Players[view_as<int>(this)].MaxHP;
+                }
+
+                public set(int hp)
+                {
+                        Players[view_as<int>(this)].MaxHP = hp;
+                }
+        }
 
         property int ArenaIdx
         {
@@ -298,8 +312,12 @@ methodmap Player < Handle
         {
                 int client = view_as<int>(this);
                 
-                float MaxHP = float(GetEntProp(client, Prop_Data, "m_iMaxHealth"));
-                SetEntProp(client, Prop_Data, "m_iHealth", RoundFloat(MaxHP * hpRatio));
+                if (IsPlayerAlive(client))
+                {
+                        int MaxHP = GetEntProp(client, Prop_Data, "m_iMaxHealth");
+                        //SetEntProp(client, Prop_Data, "m_iHealth", RoundFloat(MaxHP * hpRatio));
+                        SetEntityHealth(client, RoundFloat(MaxHP * hpRatio));
+                }
         }
 
         // Replenish player ammo after a kill.
