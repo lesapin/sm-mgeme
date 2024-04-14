@@ -30,7 +30,7 @@
 
 #pragma newdecls required
 
-#define PL_VER "0.8.6"
+#define PL_VER "0.8.7"
 #define PL_DESC "A complete rewrite of MGEMod by Lange"
 #define PL_URL "https://mge.me"
 
@@ -47,7 +47,8 @@ public Plugin myinfo =
 #define GAMEDATA "mgeme.plugin"
 #define NAMED_ITEM "CTFPlayer::GiveNamedItem"
 
-#define ADD_USAGE "Usage: add < arenaid > < fraglimit > < 1/2 : 1v1/2v2 > < 1/0 : Elo/NoElo >" 
+#define ADD_USAGE "!add < arena id/name > [ -fraglimit < number > -noelo -2v2 ]" 
+#define ADD_FLAGS 3
 
 Handle HUDScore,
        HUDArena,
@@ -77,7 +78,7 @@ public void OnPluginStart()
         RegConsoleCmd("mgeme", Command_MGEME, "Display plugin information.");
 
         HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre);
-        HookEvent("player_spawn", Event_PlayerSpawn, EventHookMode_Pre);
+        HookEvent("player_spawn", Event_PlayerSpawn_Post, EventHookMode_Post);
         HookEvent("player_team", Event_PlayerTeam, EventHookMode_Pre);
         HookEvent("player_class", Event_PlayerClass_Post, EventHookMode_Post);
         HookEvent("teamplay_round_start", Event_RoundStart_Post, EventHookMode_Post);
@@ -153,87 +154,105 @@ Action Command_Add(int _client, int args)
 {
         int client = _client;
 
-        if (args > 0)
+        if (!args)
         {
-                int FourPlayer = 0, FragLimit = 0;
-                bool EloEnabled = true;
+                ShowArenaSelectMenu(client);
+                return Plugin_Handled;
+        }
 
-                int ArenaIdx = GetCmdArgInt(1);
+        char arg[128];
 
-                if (ArenaIdx > 0 && ArenaIdx <= NumArenas)
+        GetCmdArgString(arg, sizeof(arg));
+
+        int HyphenIdx, NumFlags = 0;
+        char ArenaString[64];
+
+        char Flags[ADD_FLAGS][64];
+
+        if ((HyphenIdx = FindCharInString(arg, '-')) > -1)
+        {
+                strcopy(ArenaString, HyphenIdx, arg);
+
+                int NextHyphen;
+
+                for (int i = 0; i < ADD_FLAGS; i++)
                 {
-#if defined _DEBUG
-                        if (args == 2)
-                        {
-                                client = GetCmdArgInt(2);
-                        }
-#else
-                        if (args > 1)
-                        {
-                                FragLimit = GetCmdArgInt(2);
+                        NumFlags++;
+                        NextHyphen = SplitString(arg[HyphenIdx + 1], "-", Flags[i], sizeof(Flags[]));
 
-                                if (!FragLimit)
-                                {
-                                        ReplyToCommand(client, ADD_USAGE);
-                                        return Plugin_Handled;
-                                }
-                        }
-#endif
-                        if (args > 2)
+                        if (NextHyphen == -1)
                         {
-                                FourPlayer = GetCmdArgInt(3);
+                                strcopy(Flags[i], sizeof(Flags[]), arg[HyphenIdx + 1]);
+                                break;
                         }
 
-                        if (args > 3)
-                        {
-                                EloEnabled = GetCmdArgInt(4) == 1 ? true : false;
-                        }
-                }
-                else
-                {
-                        char arg[32];
-                        GetCmdArgString(arg, sizeof(arg));
-                        ArenaIdx = StringToArenaIdx(arg);
-                }
-                    
-                if (ArenaIdx)
-                {
-                        Player _Player = view_as<Player>(client);
-
-                        if (ArenaIdx == _Player.ArenaIdx)
-                        {
-                                return Plugin_Handled;
-                        }
-
-                        Arena _Arena = view_as<Arena>(ArenaIdx);
-
-                        if (_Arena.BBall || _Arena.Endif || _Arena.KOTH || _Arena.Turris)
-                        {
-                                ReplyToCommand(client, "This mode is not supported");
-                                return Plugin_Handled;
-                        }
-
-                        if (_Arena.IsEmpty())
-                        {
-                                _Arena.EloEnabled = EloEnabled;
-                                _Arena.FourPlayer = FourPlayer > 1 ? true : false;
-                                _Arena.FragLimit = FragLimit > 0 ? FragLimit : _Arena.FragLimit;
-                        }
-                        else if (args > 1)
-                        {
-                                ReplyToCommand(client, "Arena is not empty");
-                                return Plugin_Handled;
-                        }
-
-                        RemovePlayerFromArena(client, false);
-                        AddPlayerToArena(client, ArenaIdx);
-
-                        return Plugin_Handled;
+                        TrimString(Flags[i]);
+                        HyphenIdx = HyphenIdx + NextHyphen;
                 }
         }
-        
-        ReplyToCommand(client, ADD_USAGE);
-        ShowArenaSelectMenu(client);
+        else
+        {
+                strcopy(ArenaString, sizeof(ArenaString), arg);
+        }
+
+        int ArenaIdx = StringToInt(ArenaString);
+
+        if (!(ArenaIdx > 0 && ArenaIdx <= NumArenas))
+        {
+                TrimString(ArenaString);
+                ArenaIdx = StringToArenaIdx(ArenaString);
+        }
+
+        if (ArenaIdx)
+        {
+#if defined _DEBUG
+                PrintToChat(client, "arena: %s, flags: %i", ArenaString, NumFlags);
+                for (int i = 0; i < NumFlags; i++)
+                {
+                        PrintToChat(client, "flags %i: %s", i, Flags[i]);
+                }
+#endif
+                Player _Player = view_as<Player>(client);
+
+                if (ArenaIdx == _Player.ArenaIdx)
+                {
+                        return Plugin_Handled;
+                }
+
+                Arena _Arena = view_as<Arena>(ArenaIdx);
+
+                if (_Arena.BBall || _Arena.Endif || _Arena.KOTH || _Arena.Turris)
+                {
+                        ReplyToCommand(client, "This mode is not supported");
+                        return Plugin_Handled;
+                }
+
+                if (NumFlags > 0 && _Arena.IsEmpty())
+                {
+                        for (int i = 0; i < NumFlags; i++)
+                        {
+                                if (strcmp(Flags[i], "noelo") == 0)
+                                {
+                                        _Arena.EloEnabled = false;
+                                }
+                                else if (strcmp(Flags[i], "2v2") == 0)
+                                {
+                                        _Arena.FourPlayer = true;
+                                }
+                                else if (StrContains(Flags[i], "fraglimit", false) > -1)
+                                {
+                                        _Arena.FragLimit = StringToInt(Flags[i][10]); // "fraglimit " == 10
+                                }
+                        }
+                }
+
+                RemovePlayerFromArena(client, false);
+                AddPlayerToArena(client, ArenaIdx);
+        }
+        else
+        {
+                ReplyToCommand(client, "Usage: %s", ADD_USAGE);
+        }
 
         return Plugin_Handled;
 }
@@ -275,7 +294,7 @@ Action Command_Settings(int client, int args)
 
 Action Command_MGEME(int client, int args)
 {
-        MC_PrintToChat(client, "{green}MGEME {default}Version %s\n{olive}%s", PL_VER, PL_DESC);
+        MC_PrintToChat(client, "{green}MGEME {olive}Version %s\n{default}%s", PL_VER, PL_DESC);
         MC_PrintToChat(client, "{green}Author: {olive}bzdmn");
         MC_PrintToChat(client, "{green}Website: {olive}%s", PL_URL);
         MC_PrintToChat(client, "{green}Commands: {olive}!add !remove !rank");
@@ -1070,51 +1089,7 @@ int FragLimitPanelHandler(Menu menu, MenuAction action, int param1, int param2)
  * TIMER FUNCTIONS
  * =============================================================================
  */
-/*
-public Action Timer_Teleport(Handle timer, int serial)
-{
-        int client = GetClientFromSerial(serial);
 
-        if (client > 0)
-        {
-#if defined _DEBUG
-                PrintToChat(client, "Timer_Teleport");
-#endif
-                Player _Player = view_as<Player>(client);
-                Arena _Arena = view_as<Arena>(_Player.ArenaIdx);
-
-                float xyz[3], angles[3];
-
-                if (_Arena.MatchOngoing())
-                {
-                        float Coords[3];
-                        Player Opp1 = view_as<Player>(_Arena.Opponent1(client));
-                        Player Opp2 = view_as<Player>(_Arena.Opponent2(client));
-
-                        if (Opp1.IsValid)
-                        {       
-                                Opp1.GetCoords(Coords); 
-                        }
-                        else
-                        {
-                                Opp2.GetCoords(Coords);
-                        }
-
-                        _Arena.GetFarSpawn(xyz, angles, Coords);
-                }
-                else
-                {
-                        _Arena.GetRandomSpawn(xyz, angles);
-                }
-
-                _Player.Teleport(xyz, angles);
-
-                UpdateHUD(_Arena, client);
-        }
-
-        return Plugin_Stop;
-}
-*/
 public Action Timer_Respawn(Handle timer, int serial)
 {
         int client = GetClientFromSerial(serial);
@@ -1123,6 +1098,19 @@ public Action Timer_Respawn(Handle timer, int serial)
         {
                 TF2_RespawnPlayer(client);
                 //RequestFrame(SpawnNextFrame, client);
+        }
+
+
+        return Plugin_Stop;
+}
+
+public Action Timer_UpdateHUDAfterRespawn(Handle timer, int serial)
+{
+        int client = GetClientFromSerial(serial);
+
+        if (client)
+        {
+                UpdateHUD(view_as<Arena>(view_as<Player>(client).ArenaIdx), client);
         }
 
         return Plugin_Stop;
@@ -1217,7 +1205,7 @@ public Action Timer_WelcomeMsg1(Handle timer, int serial)
 
         if (client)
         {
-                MC_PrintToChat(client, "{olive}To join an arena, type {green}!add <arenaid/name>");
+                MC_PrintToChat(client, "{olive}Type {green}%s {olive}to join", ADD_USAGE);
                 CreateTimer(6.0, Timer_WelcomeMsg2, serial);
         }
 
@@ -1327,7 +1315,7 @@ public Action Event_PlayerDeath(Event ev, const char[] name, bool dontBroadcast)
         return Plugin_Continue;
 }
 
-public Action Event_PlayerSpawn(Event ev, const char[] name, bool dontBroadcast)
+public Action Event_PlayerSpawn_Post(Event ev, const char[] name, bool dontBroadcast)
 {
         int client = GetClientOfUserId(ev.GetInt("userid"));
 #if defined _DEBUG
@@ -1354,14 +1342,18 @@ public Action Event_PlayerSpawn(Event ev, const char[] name, bool dontBroadcast)
                 }
 
                 _Arena.GetFarSpawn(xyz, angles, Coords);
+        
         }
         else
         {
                 _Arena.GetRandomSpawn(xyz, angles);
+        
+                //UpdateHUD(_Arena, client);
+                //RequestFrame(UpdateHUDNextFrame, client);
         }
-
-        UpdateHUD(_Arena, client);
-        //RequestFrame(UpdateHUDNextFrame, client);
+        
+        //UpdateHUD(_Arena, client);
+        CreateTimer(0.1, Timer_UpdateHUDAfterRespawn, client);
 
         _Player.RefreshHP(_Arena.HPRatio);
         _Player.Teleport(xyz, angles);

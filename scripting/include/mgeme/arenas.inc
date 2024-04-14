@@ -1453,7 +1453,6 @@ ArenaState UpdateState(Arena arena, ArenaState newState)
 #endif
                         arena.REDScore = 0;
                         arena.BLUScore = 0;
-                        arena.SetHUD("");
 
                         Event ev = CreateEvent("teamplay_team_ready");
                         ev.SetInt("team", view_as<int>(arena));
@@ -1467,6 +1466,7 @@ ArenaState UpdateState(Arena arena, ArenaState newState)
                         PrintToChatAll("Arena_Started");
 #endif
                         arena.ClientReplaced = 0;
+                        arena.SetHUD("");
 
                         return Arena_Started;
                 }
