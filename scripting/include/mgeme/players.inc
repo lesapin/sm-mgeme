@@ -325,7 +325,8 @@ methodmap Player < Handle
         {
                 int client = view_as<int>(this);
                 
-                if (this.Primary > 0)
+                //if (this.Primary > 0)
+                if (IsValidEntity(this.Primary))
                 {
                         if (this.ClipPrimary > 0)
                         {
@@ -338,7 +339,8 @@ methodmap Player < Handle
                         }
                 }
 
-                if (this.Secondary > 0)
+                //if (this.Secondary > 0)
+                if (IsValidEntity(this.Secondary))
                 {
                         if (this.ClipSecondary > 0)
                         {
