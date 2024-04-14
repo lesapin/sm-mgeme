@@ -47,7 +47,7 @@ public Plugin myinfo =
 #define GAMEDATA "mgeme.plugin"
 #define NAMED_ITEM "CTFPlayer::GiveNamedItem"
 
-#define ADD_USAGE "!add < arena id/name > [ -fraglimit < number > -noelo -2v2 ]" 
+#define ADD_USAGE "!add <arena id/name> [-fraglimit <number> -noelo -2v2]" 
 #define ADD_FLAGS 3
 
 Handle HUDScore,
@@ -971,11 +971,13 @@ void SpectateNextFrame(int client)
         }
 }
 
+/*
 void UpdateHUDNextFrame(int client)
 {
         Player _Player = view_as<Player>(client);
         UpdateHUD(view_as<Arena>(_Player.ArenaIdx), client);
 }
+*/
 
 /**
  * =============================================================================
@@ -1205,7 +1207,7 @@ public Action Timer_WelcomeMsg1(Handle timer, int serial)
 
         if (client)
         {
-                MC_PrintToChat(client, "{olive}Type {green}%s {olive}to join", ADD_USAGE);
+                MC_PrintToChat(client, "{green}%s {olive}to join", ADD_USAGE);
                 CreateTimer(6.0, Timer_WelcomeMsg2, serial);
         }
 
@@ -1347,16 +1349,13 @@ public Action Event_PlayerSpawn_Post(Event ev, const char[] name, bool dontBroad
         else
         {
                 _Arena.GetRandomSpawn(xyz, angles);
-        
-                //UpdateHUD(_Arena, client);
-                //RequestFrame(UpdateHUDNextFrame, client);
         }
-        
-        //UpdateHUD(_Arena, client);
-        CreateTimer(0.1, Timer_UpdateHUDAfterRespawn, client);
 
         _Player.RefreshHP(_Arena.HPRatio);
         _Player.Teleport(xyz, angles);
+        
+        UpdateHUD(_Arena, client);
+        //CreateTimer(0.3, Timer_UpdateHUDAfterRespawn, client);
 
         return Plugin_Continue;
 }
@@ -1406,8 +1405,8 @@ public Action Event_PlayerTeam(Event ev, const char[] name, bool dontBroadcast)
                 }
         }
         
-        UpdateHUD(_Arena, client, true, false);
-        //RequestFrame(UpdateHUDNextFrame, client);
+        //UpdateHUD(_Arena, client, true, false);
+        CreateTimer(0.3, Timer_UpdateHUDAfterRespawn, client);
        
         return Plugin_Handled;
 }
@@ -1421,7 +1420,8 @@ public Action Event_PlayerClass_Post(Event ev, const char[] name, bool dontBroad
         Player _Player = view_as<Player>(client);
         Arena _Arena = view_as<Arena>(_Player.ArenaIdx);
 
-        UpdateHUD(_Arena, client);
+        //UpdateHUD(_Arena, client);
+        CreateTimer(0.3, Timer_UpdateHUDAfterRespawn, client);
 
         return Plugin_Continue;
 }
