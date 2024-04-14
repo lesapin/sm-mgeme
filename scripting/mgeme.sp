@@ -30,7 +30,7 @@
 
 #pragma newdecls required
 
-#define PL_VER "0.8.7"
+#define PL_VER "0.8.8"
 #define PL_DESC "A complete rewrite of MGEMod by Lange"
 #define PL_URL "https://mge.me"
 
@@ -77,10 +77,11 @@ public void OnPluginStart()
         RegConsoleCmd("settings", Command_Settings, "Arena preferences.");
         RegConsoleCmd("mgeme", Command_MGEME, "Display plugin information.");
 
-        HookEvent("player_death", Event_PlayerDeath_Post, EventHookMode_Post);
+        HookEvent("player_death", Event_PlayerDeath, EventHookMode_Pre);
         HookEvent("player_spawn", Event_PlayerSpawn_Post, EventHookMode_Post);
         HookEvent("player_team", Event_PlayerTeam, EventHookMode_Pre);
-        HookEvent("player_class", Event_PlayerClass_Post, EventHookMode_Post);
+        HookEvent("player_team", Event_PlayerTeam_Post, EventHookMode_Post);
+        //HookEvent("player_class", Event_PlayerClass_Post, EventHookMode_Post);
         HookEvent("teamplay_round_start", Event_RoundStart_Post, EventHookMode_Post);
         HookEvent("teamplay_team_ready", Event_TeamReady_Post, EventHookMode_Post);
         HookEvent("teamplay_round_win", Event_RoundWin_Post, EventHookMode_Post);
@@ -336,7 +337,7 @@ Action Command_JoinClass(int client, const char[] cmd, int args)
         else
         {
                 ForcePlayerSuicide(client);
-                CreateTimer(0.3, Timer_UpdateHUDAfterRespawn, client);
+                CreateTimer(0.8, Timer_UpdateHUDAfterRespawn, client);
                 return Plugin_Continue;
         }
 
@@ -608,28 +609,28 @@ void ScoreWinners(TFTeam winningTeam, Arena arena)
                 {
                         Red1.Wins = Red1.Wins + 1;
                         Red1.Elo = Red1.Elo + EloDiff;
-                        MC_PrintToChat(arena.REDPlayer1, "{green}[MGE] {default}You gained %i Elo", EloDiff);
+                        MC_PrintToChat(arena.BLUPlayer1, "{green}[MGE] {default}You gained {olive}%i {default}Elo", EloDiff);
                 }
                 
                 if (Red2.IsValid) 
                 {
                         Red2.Wins = Red2.Wins + 1;
                         Red2.Elo = Red2.Elo + EloDiff;
-                        MC_PrintToChat(arena.REDPlayer2, "{green}[MGE] {default}You gained %i Elo", EloDiff);
+                        MC_PrintToChat(arena.BLUPlayer1, "{green}[MGE] {default}You gained {olive}%i {default}Elo", EloDiff);
                 }
 
                 if (Blu1.IsValid) 
                 {
                         Blu1.Losses = Blu1.Losses + 1;
                         Blu1.Elo = Blu1.Elo - EloDiff;
-                        MC_PrintToChat(arena.BLUPlayer1, "{green}[MGE] {default}You lost %i Elo", EloDiff);
+                        MC_PrintToChat(arena.BLUPlayer1, "{green}[MGE] {default}You lost {olive}%i {default}Elo", EloDiff);
                 }
 
                 if (Blu2.IsValid) 
                 {
                         Blu2.Losses = Blu2.Losses + 1;
                         Blu2.Elo = Blu2.Elo - EloDiff;
-                        MC_PrintToChat(arena.BLUPlayer2, "{green}[MGE] {default}You lost %i Elo", EloDiff);
+                        MC_PrintToChat(arena.BLUPlayer1, "{green}[MGE] {default}You lost {olive}%i {default}Elo", EloDiff);
                 }
         }
         else
@@ -706,7 +707,8 @@ void MatchOver(Arena arena, int client)
                         GetClientName(client, loser, sizeof(loser));
                         arena.GetName(name, sizeof(name));
 
-                        MC_PrintToChatAll("{green}%s (%i) {olive}defeats {green}%s (%i) {olive}in %s",
+                        MC_PrintToChatAll("{lightgreen}%s {default}(Score:%i) defeats {lightgreen}%s \ 
+                                          {default}(Score:%i) on {green}%s",
                                           winner, arena.WinnerScore, loser, arena.LoserScore, name);
                 }
 
@@ -764,10 +766,11 @@ void UpdateHUD(Arena arena, int client, bool updateEverything = true, bool updat
                                      arena.RedScoreOffset : arena.BluScoreOffset ;
                 
                         Format(scores, sizeof(scores), "\n %i\n %i", arena.BLUScore, arena.REDScore);
-                        SetHudTextParams(float(offset) * 0.0093, 0.01, 99999.9, 255, 255, 255, 125);
+                        SetHudTextParams(float(offset) * 0.0093, 0.01, 120.0, 255, 255, 255, 125);
                 }
 
                 ShowSyncHudText(client, HUDScore, "%s", scores);
+                //ShowHudText(client, 1, "%s", scores);
         }
         else
         {
@@ -776,15 +779,17 @@ void UpdateHUD(Arena arena, int client, bool updateEverything = true, bool updat
 
         if (updateEverything)
         {
-                SetHudTextParams(0.01, 0.01, 99999.9, 255, 255, 255, 125);
+                SetHudTextParams(0.01, 0.01, 120.0, 255, 255, 255, 125);
                 ShowSyncHudText(client, HUDArena, "%s", hud);
+                //ShowHudText(client, 2, "%s", hud);
         }
 
-        SetHudTextParams(0.65, 0.95, 99999.9, 60, 238, 255, 255);
+        SetHudTextParams(0.65, 0.95, 120.0, 60, 238, 255, 255);
         ShowSyncHudText(client, HUDBanner, "mge.me");
+        //ShowHudText(client, 3, "mge.me");
 }
 
-void UpdateSpectatorHUDs(Arena arena, bool updateEverything = false)
+void UpdateSpectatorHUDs(Arena arena)
 {
         LinkedList Node = arena.SpectatorList.HeadNode();
 
@@ -840,7 +845,7 @@ void UpdateArenaHUDs(Arena arena)
 
         if (arena.NumSpectators > 0)
         {
-                UpdateSpectatorHUDs(arena, true);
+                UpdateSpectatorHUDs(arena);
         }
 }
 
@@ -1246,7 +1251,7 @@ public Action Timer_Warning(Handle timer, int serial)
  * =============================================================================
  */
 
-public Action Event_PlayerDeath_Post(Event ev, const char[] name, bool dontBroadcast)
+public Action Event_PlayerDeath(Event ev, const char[] name, bool dontBroadcast)
 {
         int client = GetClientOfUserId(ev.GetInt("userid"));
         int attacker = GetClientOfUserId(ev.GetInt("attacker"));
@@ -1277,9 +1282,7 @@ public Action Event_PlayerDeath_Post(Event ev, const char[] name, bool dontBroad
                 if (client != attacker && _Arena.IsPlaying(attacker))
                 {
                         int HP = GetEntProp(attacker, Prop_Data, "m_iHealth");
-                        HP = HP > 0 ? HP : 0;
-                        MC_PrintToChat(client, "{green}[MGE] {default}Attacker had %i health left", HP);
-
+                        MC_PrintToChat(client, "{green}[MGE] {default}Attacker had {lightgreen}%i {default}health left", HP);
                         view_as<Player>(attacker).RefreshHP(_Arena.HPRatio);
                         view_as<Player>(attacker).RefreshAmmo();
                 }
@@ -1313,6 +1316,8 @@ public Action Event_PlayerDeath_Post(Event ev, const char[] name, bool dontBroad
         }
 
         CreateTimer(_Arena.RespawnTime, Timer_Respawn, GetClientSerial(client));
+
+        ClearHUD(client);
         
         return Plugin_Continue;
 }
@@ -1354,13 +1359,20 @@ public Action Event_PlayerSpawn_Post(Event ev, const char[] name, bool dontBroad
         _Player.RefreshHP(_Arena.HPRatio);
         _Player.Teleport(xyz, angles);
         
-        UpdateHUD(_Arena, client);
-        //CreateTimer(0.3, Timer_UpdateHUDAfterRespawn, client);
+        //UpdateHUD(_Arena, client);
+        CreateTimer(0.4, Timer_UpdateHUDAfterRespawn, client);
+        //UpdateHUDNextFrame(client);
 
         return Plugin_Continue;
 }
 
 public Action Event_PlayerTeam(Event ev, const char[] name, bool dontBroadcast)
+{
+        ev.BroadcastDisabled = true;
+        return Plugin_Continue;
+}
+
+public Action Event_PlayerTeam_Post(Event ev, const char[] name, bool dontBroadcast)
 {
         int client = GetClientOfUserId(ev.GetInt("userid"));
 #if defined _DEBUG
@@ -1404,11 +1416,19 @@ public Action Event_PlayerTeam(Event ev, const char[] name, bool dontBroadcast)
                         RequestFrame(SpawnNextFrame, client);
                 }
         }
+
+        if (NewTeam != TFTeam_Spectator)
+        {
+                char arena[32], playerName[32];
+                GetClientName(client, playerName, sizeof(playerName));
+                _Arena.GetName(arena, sizeof(arena));
+                MC_PrintToChatAll("{lightgreen}%s {default}joined arena {green}%s", playerName, arena);
+        }
         
         //UpdateHUD(_Arena, client, true, false);
-        CreateTimer(0.3, Timer_UpdateHUDAfterRespawn, client);
+        CreateTimer(0.8, Timer_UpdateHUDAfterRespawn, client);
        
-        return Plugin_Handled;
+        return Plugin_Continue;
 }
 
 public Action Event_PlayerClass_Post(Event ev, const char[] name, bool dontBroadcast)
@@ -1417,8 +1437,8 @@ public Action Event_PlayerClass_Post(Event ev, const char[] name, bool dontBroad
 #if defined _DEBUG
         PrintToChat(client, "Event_PlayerClass_Post");
 #endif
-        Player _Player = view_as<Player>(client);
-        Arena _Arena = view_as<Arena>(_Player.ArenaIdx);
+        //Player _Player = view_as<Player>(client);
+        //Arena _Arena = view_as<Arena>(_Player.ArenaIdx);
  
         //UpdateHUD(_Arena, client);
         //CreateTimer(0.3, Timer_UpdateHUDAfterRespawn, client);
@@ -1617,7 +1637,9 @@ MRESReturn DHook_WeaponChange(Address pThis, Handle hReturn, Handle hParams)
 
         Player _Player = view_as<Player>(client);
 
-        if (HasEntProp(WeaponEnt, Prop_Data, "m_iClip1"))
+        if (HasEntProp(WeaponEnt, Prop_Data, "m_iClip1") && 
+            HasEntProp(WeaponEnt, Prop_Data, "m_iPrimaryAmmoType") 
+        )
         {
                 if (WeaponSlot == 0)
                 {
