@@ -195,7 +195,7 @@ public void OnClientPostAdminCheck(int client)
         ++CONNECTIONS;
 }
 
-public void OnClientDisconnect_Post(int client)
+public void OnClientDisconnect(int client)
 {
         char steamid[64];
         GetClientAuthId(client, AuthId_SteamID64, steamid, sizeof(steamid));
