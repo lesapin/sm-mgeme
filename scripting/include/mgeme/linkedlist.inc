@@ -29,8 +29,8 @@
 
 enum
 {
-        LLEmpty = -1,
-        LLRoot = 0
+        LLRoot = -1,
+        LLEmpty = 0,
 };
 
 methodmap LinkedList < StringMap
@@ -81,6 +81,22 @@ methodmap LinkedList < StringMap
                         this.GetValue("next", next);
                         return view_as<LinkedList>(next).Clone;
                 }
+        }
+
+        public int NextValue()
+        {
+                int value = LLEmpty;
+
+                if (this.HasNext)
+                {
+                        int next;
+                        this.GetValue("next", next);
+                        LinkedList node = view_as<LinkedList>(next).Clone;
+                        node.GetValue("value", value);
+                        delete node;
+                }
+
+                return value;
         }
 
         public void Append(int val)
@@ -136,6 +152,21 @@ methodmap LinkedList < StringMap
 
                 delete node;
                 return false;
+        }
+
+        public void DeleteAll()
+        {
+                LinkedList node = this.Clone;
+
+                while (node.HasNext)
+                {
+                        int next;
+                        node.GetValue("next", next);
+                        delete node;
+                        node = view_as<LinkedList>(next);
+                }
+
+                delete node;
         }
 
         public bool HasValue(int val)
