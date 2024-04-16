@@ -25,6 +25,7 @@
 #endif
 #define _mgeme_arenas_included
 
+#include <mgeme/linkedlist>
 #include <tf2>
 #include <tf2_stocks>
 
@@ -35,13 +36,6 @@
 #define ARENA_HUD_SIZE 255
 
 int NumArenas;
-
-enum struct Vec
-{
-        float x;
-        float y;
-        float z;
-}
 
 enum ClassType
 {
@@ -56,201 +50,6 @@ enum ClassType
         Class_Pyro     = 1 << 7,
         Class_Medic    = 1 << 8
 };
-
-enum
-{       
-        EmptyNode = -1,
-        RootNode  = 0
-};
-
-methodmap LinkedList < Handle 
-{
-        public LinkedList() 
-        {
-                StringMap Node = CreateTrie();
-                
-                /**
-                * A unique identifier for the client over the entire server uptime.
-                */
-                Node.SetValue("ClientSerial", RootNode, true);
-        
-                /**
-                * Handle to the next node in the linked list.
-                */
-                //Node.SetValue("Next", EndNode, true);
-                
-                return view_as<LinkedList>(Node);
-        }
-
-        property int ClientSerial
-        {
-                public get() 
-                { 
-                        StringMap Current = view_as<StringMap>(this);
-                        int Serial;
-
-                        if (Current.GetValue("ClientSerial", Serial)) return Serial;
-                        else return 0;
-                }
-        }
-
-        property int Size
-        {
-                public get()
-                {
-                        StringMap Current = view_as<StringMap>(this);
-                        int _Size = 0;
-
-                        // Don't count the root node
-                        while (Current.GetValue("Next", Current)) 
-                        { 
-                                _Size++; 
-                        }
-
-                        return _Size;
-                }
-        }
-
-        public LinkedList Append(int serial) 
-        {
-                StringMap Current = view_as<StringMap>(this);
-                StringMap Next;
-                int ClientSerial;
-
-                while (Current.GetValue("Next", Next)) 
-                { 
-                        if (ClientSerial == serial)
-                        {
-                                return view_as<LinkedList>(Current);
-                        }
-
-                        Current = Next; 
-                }
-
-                Current.GetValue("ClientSerial", ClientSerial);
-                if (ClientSerial == serial)
-                {
-                        return view_as<LinkedList>(Current);
-                }
-
-                StringMap NewNode = CreateTrie();
-                NewNode.SetValue("ClientSerial", serial, true);
-
-                Current.SetValue("Next", NewNode, true);
-
-                return view_as<LinkedList>(NewNode);
-        }
-
-        public bool Delete(int serial)
-        {
-                StringMap Current = view_as<StringMap>(this);
-                StringMap Previous, Next;
-
-                int ClientSerial;
-
-                do
-                {
-                        Current.GetValue("ClientSerial", ClientSerial);
-
-                        if (ClientSerial == serial)
-                        {
-                                if (Current.GetValue("Next", Next))
-                                {
-                                        Previous.SetValue("Next", Next, true);
-                                }
-                                else
-                                {
-                                        Previous.Remove("Next");
-                                }
-
-                                delete Current;
-                                return true;
-                        }
-
-                        Previous = Current;
-                }
-                while (Current.GetValue("Next", Current))
-
-                return false;
-        }
-
-        public void DeleteAll()
-        {
-                int ClientSerial = this.Head();
-
-                while (ClientSerial != 0)
-                {       
-                        this.Delete(ClientSerial);
-                        ClientSerial = this.Head();
-                }
-        }
-
-        public bool Exists(int serial) 
-        {
-                StringMap Current = view_as<StringMap>(this);
-                StringMap Next;
-
-                int ClientSerial;
-                bool cont;
-
-                do
-                { 
-                        cont = Current.GetValue("Next", Next);
-                        Current.GetValue("ClientSerial", ClientSerial);
-
-                        if (ClientSerial == serial) 
-                        {
-                                return true;
-                        }
-                        else Current = Next; 
-                } 
-                while (cont);
-
-                return false;
-        }
-
-        public int Head()
-        {
-                StringMap Current = view_as<StringMap>(this);
-                StringMap Next;
-
-                int ClientSerial;
-                Current.GetValue("ClientSerial", ClientSerial);
-
-                if (ClientSerial == RootNode && Current.GetValue("Next", Next))
-                {
-                        Next.GetValue("ClientSerial", ClientSerial);
-                }
-
-                return ClientSerial;
-        }
-
-        public LinkedList HeadNode()
-        {
-                StringMap Current = view_as<StringMap>(this);
-                StringMap Next;
-
-                if (Current.GetValue("Next", Next))
-                {
-                        return view_as<LinkedList>(Next);
-                }
-
-                return view_as<LinkedList>(EmptyNode);
-        }
-
-        public bool HasNext()
-        {
-                StringMap Current = view_as<StringMap>(this);
-                StringMap Next;
-
-                if (Current.GetValue("Next", Next))
-                {
-                        return true;
-                }
-                
-                return false;
-        }
-}
 
 enum ArenaState
 {
@@ -782,7 +581,7 @@ methodmap Arena < Handle
         {
                 public get()
                 {
-                        return this.PlayerQueue.Size;
+                        return this.PlayerQueue.Size() - 1;
                 }
         }
 
@@ -790,7 +589,7 @@ methodmap Arena < Handle
         {
                 public get()
                 {
-                        return this.SpectatorList.Size;
+                        return this.SpectatorList.Size() - 1;
                 }
         }
 
@@ -1006,27 +805,6 @@ methodmap Arena < Handle
                         // Attempt one more time.
                         this.GetRandomSpawnWithout(SpawnId, coords, angles);
                 }
-
-                /* 
-                float MaxDist = 0.0;
-                int SpawnId, MaxDistSpawnId = 1;
-
-                while (SpawnId <= this.NumSpawns)
-                {
-                        Distance = FloatAbs(xyz[0]-opp[0]) + FloatAbs(xyz[1]-opp[1]) + FloatAbs(xyz[2]-opp[2]);
-                        PrintToChatAll("dist: %0.1f", Distance);
-                        
-                        if (Distance > MaxDist)
-                        {
-                                MaxDist = Distance;
-                                MaxDistSpawnId = SpawnId;
-                        }
-
-                        this.GetSpawn(++SpawnId, xyz, ang);
-                }
-                
-                this.GetSpawn(MaxDistSpawnId, coords, angles);
-                */
         }
 
         public void Add(int client)
@@ -1482,7 +1260,7 @@ ArenaState UpdateState(Arena arena, ArenaState newState)
                         ev.SetInt("full_round", view_as<int>(arena));
                         ev.Fire();
                         
-                        CreateTimer(float(arena.CDTime), Timer_End_Cooldown, arena);
+                        CreateTimer(0.6, Timer_End_Cooldown, arena);
                         return Arena_Ended;
                 }
         }

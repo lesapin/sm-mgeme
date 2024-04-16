@@ -324,7 +324,42 @@ methodmap Player < Handle
         public void RefreshAmmo()
         {
                 int client = view_as<int>(this);
+
+                SetEntProp(GetPlayerWeaponSlot(client, 0), Prop_Data, "m_iClip1", this.ClipPrimary);
+                GivePlayerAmmo(client, 99, 1, true);
+
+                if (this.ClipSecondary > 0)
+                {
+                        SetEntProp(GetPlayerWeaponSlot(client, 1), Prop_Data, "m_iClip1", this.ClipSecondary);
+                        GivePlayerAmmo(client, 99, 2, true);
+                }
+                /*
+                int Weapon0 = GetPlayerWeaponSlot(client, 0);
+                int Weapon1 = GetPlayerWeaponSlot(client, 1);
                 
+                int Clip, Ammo, Type;
+
+                if (Weapon0 > -1)
+                {
+                        Clip = GetEntProp(Weapon0, Prop_Data, "m_iClip1");
+                        Type = GetEntProp(Weapon0, Prop_Send, "m_iPrimaryAmmoType");
+                        Ammo = GetEntProp(client, Prop_Send, "m_iAmmo", _, Type);
+                        SetEntProp(Weapon0, Prop_Data, "m_iClip1", Clip);
+                        SetEntProp(client, Prop_Send, "m_iAmmo", Ammo, _, Type);
+                }
+
+                PrintToChat(client, "type: %i", Type);
+                
+                if (Weapon1 > -1)
+                {
+                        Clip = GetEntProp(Weapon1, Prop_Data, "m_iClip1");
+                        Type = GetEntProp(Weapon1, Prop_Send, "m_iPrimaryAmmoType");
+                        Ammo = GetEntProp(client, Prop_Send, "m_iAmmo", _, Type);
+                        SetEntProp(Weapon1, Prop_Data, "m_iClip1", Clip);
+                        SetEntProp(client, Prop_Send, "m_iAmmo", Ammo, _, Type);
+                }
+
+                PrintToChat(client, "type: %i", Type);
                 //if (this.Primary > 0)
                 if (IsValidEntity(this.Primary))
                 {
@@ -351,7 +386,7 @@ methodmap Player < Handle
                         {
                                 SetEntProp(client, Prop_Send, "m_iAmmo", this.AmmoSecondary,_, this.TypeSecondary);
                         }
-                }
+                }*/
         }
 
         public void DisableAttacks(float disableTime)

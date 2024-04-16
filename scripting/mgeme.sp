@@ -23,14 +23,14 @@
 #pragma semicolon 1
 
 #include <sourcemod>
-#include <dhooks>
+//#include <dhooks>
 #include <morecolors>
 #include <mgeme/players>
 #include <mgeme/arenas>
 
 #pragma newdecls required
 
-#define PL_VER "0.8.8"
+#define PL_VER "0.8.9"
 #define PL_DESC "A complete rewrite of MGEMod by Lange"
 #define PL_URL "https://mge.me"
 
@@ -70,6 +70,7 @@ public void OnPluginStart()
 #if defined _DEBUG
         RegAdminCmd("runtests", Admin_Command_RunTests, 1, "Run test set.");
         RegAdminCmd("fakeclients", Admin_Command_CreateFakeClients, 1, "Spawn fake clients.");
+        RegAdminCmd("refresh", Admin_Command_Refresh, 1);
 #endif
         RegConsoleCmd("add", Command_Add, "Usage: add <arena number/arena name>. Join an arena.");
         RegConsoleCmd("remove", Command_Remove, "Leave the current arena or queue.");
@@ -95,6 +96,7 @@ public void OnPluginStart()
         HUDArena = CreateHudSynchronizer();
         HUDBanner = CreateHudSynchronizer();
 
+/*
         SettingsCki = RegClientCookie("Settings", "Use settings", CookieAccess_Public);
         FourPlayerCki = RegClientCookie("2v2", "Enable 2v2 mode", CookieAccess_Public);
         EloCki = RegClientCookie("Elo", "Enable Elo", CookieAccess_Public);
@@ -114,6 +116,7 @@ public void OnPluginStart()
         FragLimitPanel.DrawItem("50");
 
         DHookInit();
+*/
 }
 
 public void OnMapInit(const char[] mapName)
@@ -124,18 +127,12 @@ public void OnMapInit(const char[] mapName)
 public void OnMapStart()
 {
         PrecacheSound(SPAWN_SOUND, true);
-        //SetConVarInt(FindConVar("mp_disable_respawn_times"), 1);
         SetConVarInt(FindConVar("mp_autoteambalance"), 0);
 }
 
-public void OnClientConnected(int client)
+public void OnClientPostAdminCheck(int client)
 {
         PlayerList[client] = new Player(client);
-}
-
-public void OnClientPutInServer(int client)
-{
-        TF2_ChangeClientTeam(client, TFTeam_Spectator);
         CreateTimer(10.0, Timer_WelcomeMsg1, GetClientSerial(client));
         CreateTimer(7.0, Timer_Warning, GetClientSerial(client));
 }
@@ -387,6 +384,16 @@ Action Admin_Command_CreateFakeClients(int client, int args)
 
         return Plugin_Handled;
 }
+
+Action Admin_Command_Refresh(int client, int args)
+{
+        Player _Player = view_as<Player>(client);
+
+        _Player.RefreshAmmo();
+        _Player.RefreshHP(1.5);
+
+        return Plugin_Handled;
+}
 #endif
 
 /**
@@ -609,14 +616,14 @@ void ScoreWinners(TFTeam winningTeam, Arena arena)
                 {
                         Red1.Wins = Red1.Wins + 1;
                         Red1.Elo = Red1.Elo + EloDiff;
-                        MC_PrintToChat(arena.BLUPlayer1, "{green}[MGE] {default}You gained {olive}%i {default}Elo", EloDiff);
+                        MC_PrintToChat(arena.REDPlayer1, "{green}[MGE] {default}You gained {olive}%i {default}Elo", EloDiff);
                 }
                 
                 if (Red2.IsValid) 
                 {
                         Red2.Wins = Red2.Wins + 1;
                         Red2.Elo = Red2.Elo + EloDiff;
-                        MC_PrintToChat(arena.BLUPlayer1, "{green}[MGE] {default}You gained {olive}%i {default}Elo", EloDiff);
+                        MC_PrintToChat(arena.REDPlayer2, "{green}[MGE] {default}You gained {olive}%i {default}Elo", EloDiff);
                 }
 
                 if (Blu1.IsValid) 
@@ -630,7 +637,7 @@ void ScoreWinners(TFTeam winningTeam, Arena arena)
                 {
                         Blu2.Losses = Blu2.Losses + 1;
                         Blu2.Elo = Blu2.Elo - EloDiff;
-                        MC_PrintToChat(arena.BLUPlayer1, "{green}[MGE] {default}You lost {olive}%i {default}Elo", EloDiff);
+                        MC_PrintToChat(arena.BLUPlayer2, "{green}[MGE] {default}You lost {olive}%i {default}Elo", EloDiff);
                 }
         }
         else
@@ -639,28 +646,28 @@ void ScoreWinners(TFTeam winningTeam, Arena arena)
                 {
                         Red1.Losses = Red1.Losses + 1;
                         Red1.Elo = Red1.Elo - EloDiff;
-                        MC_PrintToChat(arena.REDPlayer1, "{olive}You lost %i Elo", EloDiff);
+                        MC_PrintToChat(arena.REDPlayer1, "{green}[MGE] {default}You lost {olive}%i {default}Elo", EloDiff);
                 }
                 
                 if (Red2.IsValid) 
                 {
                         Red2.Losses = Red2.Losses + 1;
                         Red2.Elo = Red2.Elo - EloDiff;
-                        MC_PrintToChat(arena.REDPlayer2, "{olive}You lost %i Elo", EloDiff);
+                        MC_PrintToChat(arena.REDPlayer2, "{green}[MGE] {default}You lost {olive}%i {default}Elo", EloDiff);
                 }
 
                 if (Blu1.IsValid) 
                 {
                         Blu1.Wins = Blu1.Wins + 1;
                         Blu1.Elo = Blu1.Elo + EloDiff;
-                        MC_PrintToChat(arena.BLUPlayer1, "{olive}You gained %i Elo", EloDiff);
+                        MC_PrintToChat(arena.BLUPlayer1, "{green}[MGE] {default}You gained {olive}%i {default}Elo", EloDiff);
                 }
 
                 if (Blu2.IsValid) 
                 {
                         Blu2.Wins = Blu2.Wins + 1;
                         Blu2.Elo = Blu2.Elo + EloDiff;
-                        MC_PrintToChat(arena.BLUPlayer2, "{olive}You gained %i Elo", EloDiff);
+                        MC_PrintToChat(arena.BLUPlayer2, "{green}[MGE] {default}You gained {olive}%i {default}Elo", EloDiff);
                 }
         }
 }
@@ -678,7 +685,7 @@ int TakeFromQueue(Arena arena)
 
         while (NewClient == 0 && arena.NumQueued > 0)
         {
-                Serial = arena.PlayerQueue.Head();
+                Serial = arena.PlayerQueue.NextValue();
                 NewClient = GetClientFromSerial(Serial);
                 arena.PlayerQueue.Delete(Serial);
         }
@@ -791,13 +798,16 @@ void UpdateHUD(Arena arena, int client, bool updateEverything = true, bool updat
 
 void UpdateSpectatorHUDs(Arena arena)
 {
-        LinkedList Node = arena.SpectatorList.HeadNode();
+        LinkedList Node = arena.SpectatorList.Clone;
 
-        while (Node != view_as<LinkedList>(EmptyNode))
+        while (Node.HasNext)
         {
-                int Serial = Node.ClientSerial;
+                LinkedList Next = Node.Next;
+                delete Node;
+                Node = Next;
+
+                int Serial = Node.Value;
                 int Spectator = GetClientFromSerial(Serial);
-                Node = Node.HeadNode();
                                 
                 if (!Spectator || !IsClientObserver(Spectator))
                 {
@@ -808,6 +818,8 @@ void UpdateSpectatorHUDs(Arena arena)
                         UpdateHUD(arena, Spectator, true);
                 }
         }
+
+        delete Node;
 }
 
 /**
@@ -1358,10 +1370,16 @@ public Action Event_PlayerSpawn_Post(Event ev, const char[] name, bool dontBroad
 
         _Player.RefreshHP(_Arena.HPRatio);
         _Player.Teleport(xyz, angles);
+
+        int Slot0 = GetPlayerWeaponSlot(client, 0);
+        int Slot1 = GetPlayerWeaponSlot(client, 1);
+
+        _Player.ClipPrimary = Slot0 > -1 ? GetEntProp(Slot0, Prop_Data, "m_iClip1") : 0;
+        _Player.ClipSecondary = Slot1 > -1 ? GetEntProp(Slot1, Prop_Data, "m_iClip1") : 0;
         
-        //UpdateHUD(_Arena, client);
-        CreateTimer(0.4, Timer_UpdateHUDAfterRespawn, client);
+        CreateTimer(0.5, Timer_UpdateHUDAfterRespawn, client);
         //UpdateHUDNextFrame(client);
+        //UpdateHUD(_Arena, client);
 
         return Plugin_Continue;
 }
@@ -1382,6 +1400,10 @@ public Action Event_PlayerTeam_Post(Event ev, const char[] name, bool dontBroadc
 
         Player _Player = view_as<Player>(client);
         Arena _Arena = view_as<Arena>(_Player.ArenaIdx);
+        
+        char arena[32], playerName[32];
+        GetClientName(client, playerName, sizeof(playerName));
+        _Arena.GetName(arena, sizeof(arena));
 
         // Initialize the arena for player.
         if (NewTeam == TFTeam_Red)
@@ -1399,6 +1421,8 @@ public Action Event_PlayerTeam_Post(Event ev, const char[] name, bool dontBroadc
                 {
                         RequestFrame(SpawnNextFrame, client);
                 }
+
+                MC_PrintToChatAll("{lightgreen}%s {default}joined arena {green}%s", playerName, arena);
         }
         else if (NewTeam == TFTeam_Blue)
         {
@@ -1415,18 +1439,12 @@ public Action Event_PlayerTeam_Post(Event ev, const char[] name, bool dontBroadc
                 {
                         RequestFrame(SpawnNextFrame, client);
                 }
-        }
 
-        if (NewTeam != TFTeam_Spectator)
-        {
-                char arena[32], playerName[32];
-                GetClientName(client, playerName, sizeof(playerName));
-                _Arena.GetName(arena, sizeof(arena));
                 MC_PrintToChatAll("{lightgreen}%s {default}joined arena {green}%s", playerName, arena);
         }
-        
+
         //UpdateHUD(_Arena, client, true, false);
-        CreateTimer(0.8, Timer_UpdateHUDAfterRespawn, client);
+        CreateTimer(0.5, Timer_UpdateHUDAfterRespawn, client);
        
         return Plugin_Continue;
 }
@@ -1563,6 +1581,7 @@ public Action Event_RoundWin_Post(Event ev, const char[] name, bool dontBroadcas
  * =============================================================================
  */
 
+/*
 bool DHookInit()
 {
         Handle hGameData = LoadGameConfigFile(GAMEDATA);
@@ -1615,18 +1634,30 @@ bool DHookInit()
         return true;
 }
 
-/**
- * This hook is called every time just before a player is about to change an item
- * in their loadout. During this time, the item entindex will be invalid (-1).
- * Figure out which slot got changed (0 or 1, every other slot is misc/melee),
- * and update the weapon type/clip/ammo counts.
- */
+// This hook is called every time just before a player is about to change an item
+// in their loadout. Get the new clip size in the next frame when EntIndex != -1.
 MRESReturn DHook_WeaponChange(Address pThis, Handle hReturn, Handle hParams)
 {
         int client = view_as<int>(pThis);
+
+        Player _Player = view_as<Player>(client);
+        int Primary = GetPlayerWeaponSlot(client, 0);
+        int Secondary = GetPlayerWeaponSlot(client, 1);
+
+        if (Primary > -1)
+        {
+                _Player.ClipPrimary = GetEntProp(Primary, Prop_Data, "m_iClip1");
+        }
+
+        if (Secondary > -1)
+        {
+                _Player.ClipSecondary = GetEntProp(Secondary, Prop_Data, "m_iClip1");
+        }
+
         int WeaponEnt = DHookGetReturn(hReturn); // :CBaseEntity
         int WeaponSlot = GetPlayerWeaponSlot(client, 0);
         int WeaponSlot2 = GetPlayerWeaponSlot(client, 1);
+                        _Player.ClipPrimary = GetEntProp(WeaponEnt, Prop_Data, "m_iClip1");
  
         if (WeaponSlot != -1 && WeaponSlot2 != -1)
         {
@@ -1674,7 +1705,7 @@ MRESReturn DHook_WeaponChange(Address pThis, Handle hReturn, Handle hParams)
 #endif
         return MRES_Ignored;
 }
-
+*/
 /**
  * =============================================================================
  * TESTING
@@ -1695,31 +1726,49 @@ void RunTests()
 
 void LinkedListTests()
 {
-        PrintToServer("LinkedListTests()");
-
         LinkedList test = new LinkedList();
-        
-        AssertEq("Size is 0", test.Size, 0);
-        AssertEq("Head is empty", test.Head(), 0);
+        PrintToServer("\nRunning LinkedList tests");
+        AssertEq("Value is LLRoot", test.Value, LLRoot);
+        AssertEq("HasNext is false", test.HasNext, false);
+        AssertEq("Test size is 1", test.Size(), 1);
         test.Append(123);
-        test.Append(333);
-        test.Append(64634);
-        AssertEq("Size is 3", test.Size, 3);
-        AssertEq("333 exists", test.Exists(333), true);
-        AssertEq("123 is head", test.Head(), 123);
-        AssertEq("666 can't be deleted", test.Delete(666), false);
-        AssertEq("123 was deleted", test.Delete(123), true);
-        AssertEq("Size is 2", test.Size, 2);
-        AssertEq("Head is 333", test.Head(), 333);
-        AssertEq("64634 exists", test.Exists(64634), true);
-        test.Append(765);
-        test.Append(945);
-        AssertEq("Size is 4", test.Size, 4);
-        AssertEq("765 exists", test.Exists(765), true);
+        AssertEq("Test size is 2", test.Size(), 2);
+        AssertEq("Value is LLRoot", test.Value, LLRoot);
+        AssertEq("HasNext is true", test.HasNext, true);
+        LinkedList next = test.Next;
+        AssertEq("Next value is 123", next.Value, 123);
+        AssertEq("Next HasNext is false", next.HasNext, false);
+        AssertEq("test has value 123", test.HasValue(123), true);
+        delete next;
+        LinkedList next2 = test.Next;
+        AssertEq("Next2 value is 123", next2.Value, 123);
+        next2.Append(555);
+        AssertEq("Test size is 3", test.Size(), 3);
+        AssertEq("Next2 size is 2", next2.Size(), 2);
+        LinkedList next3 = test.Next;
+        LinkedList next4 = next3.Next;
+        AssertEq("next4 value is 555", next4.Value, 555);
+        test.Append(44);
+        test.Append(93463);
+        AssertEq("Test size is 5", test.Size(), 5);
+        test.Delete(555);
+        AssertEq("Test size is 4", test.Size(), 4);
+        AssertEq("next4 size is 3", next4.Size(), 3);
+        AssertEq("next4 value is 555", next4.Value, 555);
+        AssertEq("test has value 44", test.HasValue(44), true);
+        AssertEq("test doesn't have 555", test.HasValue(555), false);
+        AssertEq("test can delete 123", test.Delete(123), true);
+        AssertEq("Test size is 3", test.Size(), 3);
+        AssertEq("can't delete 999", test.Delete(999), false);
+        AssertEq("Test size is 3", test.Size(), 3);
+        AssertEq("Can't delete LLRoot", test.Delete(LLRoot), false);
+        delete next2;
+        delete next3;
+        delete next4;
+        AssertEq("Test size is 3", test.Size(), 3);
         test.DeleteAll();
-        AssertEq("Size is 0", test.Size, 0);
-
-        delete test;
+        AssertEq("Test size is 1", test.Size(), 1);
+        PrintToServer("Test run complete\n");
 }
 
 void ArenaTests()
