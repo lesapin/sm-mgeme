@@ -120,6 +120,10 @@ methodmap LinkedList < StringMap
                                 {
                                         prev.SetValue("next", replaced, true);
                                 }
+                                else
+                                {
+                                        prev.Remove("next");
+                                }
 
                                 delete view_as<StringMap>(deleted);
                                 delete node;
