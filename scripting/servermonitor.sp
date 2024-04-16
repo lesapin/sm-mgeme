@@ -1,7 +1,7 @@
 #include <signals>
 #include <sourcemod>
 
-#define PLUGIN_VERSION "1.2.2"
+#define PLUGIN_VERSION "1.2.4"
 
 public Plugin myinfo = 
 {
@@ -115,71 +115,65 @@ public void OnPluginStart()
         FIRST_PLAYER = GetTime();
 }
 
+// plugin is (re/un)loaded during a dump cycle, export UniquePlayers 
 public void OnPluginEnd()
 {
-    // plugin is (re/un)loaded during a dump cycle, export UniquePlayers 
-    char FilePath[256];
-    BuildPath(Path_SM, FilePath, sizeof(FilePath), TMPPLAYERS);
+        char FilePath[256];
+        BuildPath(Path_SM, FilePath, sizeof(FilePath), TMPPLAYERS);
 
-    File tmpfile = OpenFile(FilePath, "w");
+        File tmpfile = OpenFile(FilePath, "w");
 
-    if (tmpfile)
-    {
-        StringMapSnapshot snapshot = UniquePlayers.Snapshot();
-        char steamid[64];
-        int playtime;
-
-        tmpfile.WriteInt32(GetTime()); //timestamp
-
-        for (int i = 0; i < snapshot.Length; i++)
+        if (tmpfile)
         {
-            snapshot.GetKey(i, steamid, sizeof(steamid));
-            UniquePlayers.GetValue(steamid, playtime);
+                StringMapSnapshot snapshot = UniquePlayers.Snapshot();
+                char steamid[64];
+                int playtime;
+
+                tmpfile.WriteInt32(GetTime()); //timestamp
+
+                for (int i = 0; i < snapshot.Length; i++)
+                {
+                        snapshot.GetKey(i, steamid, sizeof(steamid));
+                        UniquePlayers.GetValue(steamid, playtime);
         
-            tmpfile.WriteInt32(playtime);
-            tmpfile.WriteLine(steamid);
+                        tmpfile.WriteInt32(playtime);
+                        tmpfile.WriteLine(steamid);
+                }
+
+                delete snapshot;
+        }
+        else
+        {
+                LogError("Couldn't export UniquePlayers to %s", FilePath);
         }
 
-        delete snapshot;
-    }
-    else
-        LogError("Couldn't export UniquePlayers to %s", FilePath);
+        tmpfile.Close();
 
-    tmpfile.Close();
+        // export serverstats to tmpfile
+        BuildPath(Path_SM, FilePath, sizeof(FilePath), TMPSTATS);
 
-    // export serverstats to tmpfile
-    BuildPath(Path_SM, FilePath, sizeof(FilePath), TMPSTATS);
+        tmpfile = OpenFile(FilePath, "w");
 
-    tmpfile = OpenFile(FilePath, "w");
+        if (tmpfile)
+        {
+                tmpfile.WriteInt32(GetTime()); //timestamp
 
-    if (tmpfile)
-    {
-        tmpfile.WriteInt32(GetTime()); //timestamp
-
-        tmpfile.WriteInt32(MAX_CLIENTS);
-        tmpfile.WriteInt32(CONNECTIONS);
-        tmpfile.WriteInt32(ACTIVE_TIME);
-    }
-    else
-        LogError("Couldn't export serverstats to %s", FilePath);
-
-    delete tmpfile;
+                tmpfile.WriteInt32(MAX_CLIENTS);
+                tmpfile.WriteInt32(CONNECTIONS);
+                tmpfile.WriteInt32(ACTIVE_TIME);
+        }
+        else
+        {
+                LogError("Couldn't export serverstats to %s", FilePath);
+        }
+        
+        delete tmpfile;
 }
 
 /*** ONCLIENT FUNCTIONS ***/
 
-public void OnClientPostAdminCheck(int client)
+public void OnClientConnected(int client)
 {
-        char steamid[64];
-        GetClientAuthId(client, AuthId_SteamID64, steamid, sizeof(steamid));
-
-        // Insert a unique player or update their entry
-        if (!UniquePlayers.SetValue(steamid, GetTime(), false))
-        {
-                UniquePlayers.GetValue(steamid, PlaytimeStore[client]);
-                UniquePlayers.SetValue(steamid, GetTime(), true);
-        }
-
         CUR_CLIENTS++;
 
         if (CUR_CLIENTS > MAX_CLIENTS)
@@ -195,14 +189,32 @@ public void OnClientPostAdminCheck(int client)
         ++CONNECTIONS;
 }
 
-public void OnClientDisconnect(int client)
+public void OnClientPostAdminCheck(int client)
 {
         char steamid[64];
         GetClientAuthId(client, AuthId_SteamID64, steamid, sizeof(steamid));
+
+        // Insert a unique player or update their entry
+        if (!UniquePlayers.SetValue(steamid, GetTime(), false))
+        {
+                UniquePlayers.GetValue(steamid, PlaytimeStore[client]);
+                UniquePlayers.SetValue(steamid, GetTime(), true);
+        }
+}
+
+public void OnClientDisconnect(int client)
+{
+        char steamid[32] = "0";
+        if (IsClientConnected(client))
+        {
+                GetClientAuthId(client, AuthId_SteamID64, steamid, sizeof(steamid));
+        }
     
         int ConnectionTime;
-        UniquePlayers.GetValue(steamid, ConnectionTime);
-        UniquePlayers.SetValue(steamid, (GetTime() - ConnectionTime) + PlaytimeStore[client]);
+        if (UniquePlayers.GetValue(steamid, ConnectionTime))
+        {
+                UniquePlayers.SetValue(steamid, (GetTime() - ConnectionTime) + PlaytimeStore[client]);
+        }
 
         PlaytimeStore[client] = 0;
 
