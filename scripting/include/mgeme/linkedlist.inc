@@ -91,9 +91,7 @@ methodmap LinkedList < StringMap
                 {
                         int next;
                         this.GetValue("next", next);
-                        LinkedList node = view_as<LinkedList>(next).Clone;
-                        node.GetValue("value", value);
-                        delete node;
+                        view_as<StringMap>(next).GetValue("value", value);
                 }
 
                 return value;
@@ -162,6 +160,7 @@ methodmap LinkedList < StringMap
                 {
                         int next;
                         node.GetValue("next", next);
+                        node.Remove("next");
                         delete node;
                         node = view_as<LinkedList>(next);
                 }
