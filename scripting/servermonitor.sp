@@ -1,7 +1,7 @@
 #include <signals>
 #include <sourcemod>
 
-#define PLUGIN_VERSION "1.2.4"
+#define PLUGIN_VERSION "1.2.5"
 
 public Plugin myinfo = 
 {
@@ -104,15 +104,17 @@ public void OnPluginStart()
         DeleteFile(FilePath);
     }
 
-    RegServerCmd("serverstats", DumpStats_Cmd);
+        RegServerCmd("serverstats", DumpStats_Cmd);
 
-    CreateHandler(USR1, DumpStats_Callback);
-    LogMessage("Attached callback for signal USR1");
+        CreateHandler(USR1, DumpStats_Callback);
+        LogMessage("Attached callback for signal USR1");
 
-    CUR_CLIENTS = GetClientCount(true);
+        CUR_CLIENTS = GetClientCount(true);
 
-    if (CUR_CLIENTS)
-        FIRST_PLAYER = GetTime();
+        if (CUR_CLIENTS)
+        {
+                FIRST_PLAYER = GetTime();
+        }
 }
 
 // plugin is (re/un)loaded during a dump cycle, export UniquePlayers 
@@ -204,16 +206,18 @@ public void OnClientPostAdminCheck(int client)
 
 public void OnClientDisconnect(int client)
 {
-        char steamid[32] = "0";
-        if (IsClientConnected(client))
+        char steamid[32] = "";
+        
+        if (IsClientAuthorized(client))
         {
                 GetClientAuthId(client, AuthId_SteamID64, steamid, sizeof(steamid));
-        }
     
-        int ConnectionTime;
-        if (UniquePlayers.GetValue(steamid, ConnectionTime))
-        {
-                UniquePlayers.SetValue(steamid, (GetTime() - ConnectionTime) + PlaytimeStore[client]);
+                int ConnectionTime;
+
+                if (UniquePlayers.GetValue(steamid, ConnectionTime))
+                {
+                        UniquePlayers.SetValue(steamid, (GetTime() - ConnectionTime) + PlaytimeStore[client]);
+                }
         }
 
         PlaytimeStore[client] = 0;
@@ -230,103 +234,113 @@ public void OnClientDisconnect(int client)
 
 Action DumpStats_Cmd(int args)
 {
-    if (!args)
-    {
-        char tmp[32];
-        FormatTime(tmp, sizeof(tmp), "L%G%m%d", GetTime());
+        if (!args)
+        {
+                char tmp[32];
+                FormatTime(tmp, sizeof(tmp), "L%G%m%d", GetTime());
 
-        DumpStats(tmp);
-    }
+                DumpStats(tmp);
+        }
 
-    return Plugin_Handled;
+        return Plugin_Handled;
 }
 
 Action DumpStats_Callback()
 {
-    char tmp[32];
-    FormatTime(tmp, sizeof(tmp), "L%G%m%d", GetTime());
+        char tmp[32];
+        FormatTime(tmp, sizeof(tmp), "L%G%m%d", GetTime());
     
-    DumpStats(tmp);
-    ResetStats();
+        DumpStats(tmp);
+        ResetStats();
 
-    return Plugin_Handled;
+        return Plugin_Handled;
 }
 
 /*** PRIVATE FUNCTIONS ***/
 
 bool DumpStats(const char[] filename)
 {
-    char FilePath[256];
-    BuildPath(Path_SM, FilePath, sizeof(FilePath), "logs/%s.stats", filename);
+        char FilePath[256];
+        BuildPath(Path_SM, FilePath, sizeof(FilePath), "logs/%s.stats", filename);
 
-    File f = OpenFile(FilePath, "w");
+        File f = OpenFile(FilePath, "w");
 
-    if (f)
-    {
-        char steamid[32];
-        int playtime;
-        int totalPlaytime = 0;
-        
-        StringMapSnapshot snapshot = UniquePlayers.Snapshot();
-
-        for (int i = 0; i < snapshot.Length; i++)
+        if (f)
         {
-            snapshot.GetKey(i, steamid, sizeof(steamid));
-            UniquePlayers.GetValue(steamid, playtime);
+                char steamid[32];
+                int playtime;
+                int totalPlaytime = 0;
         
-            if (playtime < DUMP_CYCLE * 60 * 60)
-            {
-                totalPlaytime += playtime;
-                WriteFileLine(f, "PLAYER %s %i", steamid, playtime);
-            }
+                StringMapSnapshot snapshot = UniquePlayers.Snapshot();
+
+                for (int i = 0; i < snapshot.Length; i++)
+                {
+                        snapshot.GetKey(i, steamid, sizeof(steamid));
+                        UniquePlayers.GetValue(steamid, playtime);
+        
+                        if (playtime > DUMP_CYCLE * 60 * 60)
+                        {
+                                playtime = GetTime() - playtime;
+                        }
+                        
+                        totalPlaytime += playtime;
+                        WriteFileLine(f, "PLAYER %s %i", steamid, playtime);
+                }
+
+                for (int i = 0; i < MAX_PLAYER_SLOTS; i++)
+                {
+                        totalPlaytime += PlaytimeStore[i];
+                }
+
+                WriteFileLine(f, "MANHOURS %i", totalPlaytime);
+
+                if (!CUR_CLIENTS)
+                {
+                        WriteFileLine(f, "ACTIVETIME %i", ACTIVE_TIME);
+                }
+                else
+                {
+                        WriteFileLine(f, "ACTIVETIME %i", ACTIVE_TIME + (GetTime() - FIRST_PLAYER));
+                }
+
+                WriteFileLine(f, "MAXCLIENTS %i", MAX_CLIENTS);
+                WriteFileLine(f, "UNIQUECLIENTS %i", snapshot.Length);
+                WriteFileLine(f, "CONNECTIONS %i", CONNECTIONS);
+
+                LogMessage("Dumped server stats in %s", FilePath);
+
+                delete snapshot;
+        }
+        else
+        {
+                LogError("Unable to open file %s", FilePath);
+                return false;
         }
 
-        //for (int i = 0; i < MAX_PLAYER_SLOTS; i++)
-        //    totalPlaytime += PlaytimeStore[i];
-
-        WriteFileLine(f, "MANHOURS %i", totalPlaytime);
-
-        if (!CUR_CLIENTS)
-            WriteFileLine(f, "ACTIVETIME %i", ACTIVE_TIME);
-        else
-            WriteFileLine(f, "ACTIVETIME %i", ACTIVE_TIME + (GetTime() - FIRST_PLAYER));
-
-        WriteFileLine(f, "MAXCLIENTS %i", MAX_CLIENTS);
-        WriteFileLine(f, "CONNECTIONS %i", CONNECTIONS);
-        WriteFileLine(f, "UNIQUECLIENTS %i", snapshot.Length);
-
-        LogMessage("Dumped server stats in %s", FilePath);
-
-        delete snapshot;
-    }
-    else
-    {
-        LogError("Unable to open file %s", FilePath);
-        return false;
-    }
-
-    delete f;
-    return true;
+        delete f;
+        return true;
 }
 
 void ResetStats()
 {
-    CONNECTIONS = CUR_CLIENTS;
-    MAX_CLIENTS = CUR_CLIENTS;
+        CONNECTIONS = CUR_CLIENTS;
+        MAX_CLIENTS = CUR_CLIENTS;
 
-    if (CUR_CLIENTS)
-        FIRST_PLAYER = GetTime();
+        if (CUR_CLIENTS)
+        {
+                FIRST_PLAYER = GetTime();
+        }
 
-    StringMapSnapshot snapshot = UniquePlayers.Snapshot();
-    UniquePlayers.Clear();
+        StringMapSnapshot snapshot = UniquePlayers.Snapshot();
+        UniquePlayers.Clear();
 
-    char steamid[64]; 
+        char steamid[64]; 
 
-    for (int i = 0; i < snapshot.Length; i++)
-    {
-        snapshot.GetKey(i, steamid, sizeof(steamid));
-        UniquePlayers.SetValue(steamid, GetTime(), true);
-    }
+        for (int i = 0; i < snapshot.Length; i++)
+        {
+                snapshot.GetKey(i, steamid, sizeof(steamid));
+                UniquePlayers.SetValue(steamid, GetTime(), true);
+        }
 
-    delete snapshot;
+        delete snapshot;
 }
