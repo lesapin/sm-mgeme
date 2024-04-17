@@ -59,6 +59,9 @@ bool DBConnect()
                 return false;
         }
 
+        gDB.Query(SQLQueryCreateTable, "CREATE TABLE IF NOT EXISTS mgeme_stats (steamid TEXT, \
+        first_seen INTEGER, elo INTEGER, wins INTEGER, losses INTEGER)");
+
         return true;
 }
 
@@ -73,4 +76,12 @@ bool DBCheckError()
         }
 
         return false;
+}
+
+void SQLQueryCreateTable(Database db, DBResultSet result, const char[] error, any data)
+{
+        if (strlen(error) > 0)
+        {
+                LogError("SQLQueryCreateTable error: %s", error);
+        }
 }
