@@ -51,6 +51,8 @@ enum struct PlayerInfo
         int ClipSecondary;
 
         int MaxHP;
+
+        bool FromDatabase;
 }
 
 static PlayerInfo Players[MAX_PLAYERS + 1]; // Indexing starts at 1.
@@ -75,6 +77,7 @@ methodmap Player < Handle
                         Players[client].Losses = losses;
 
                         Players[client].ArenaIdx = 0;
+                        Players[client].FromDatabase = false;
 
                         return view_as<Player>(client);
                 }
@@ -87,6 +90,19 @@ methodmap Player < Handle
                 public get()
                 {
                         return (view_as<int>(this) > 0 && view_as<int>(this) <= MAX_PLAYERS) ? true : false;
+                }
+        }
+
+        property bool FromDatabase
+        {
+                public get()
+                {
+                        return Players[view_as<int>(this)].FromDatabase;
+                }
+
+                public set(bool fromDb)
+                {
+                        Players[view_as<int>(this)].FromDatabase = fromDb;
                 }
         }
 

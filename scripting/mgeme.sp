@@ -23,10 +23,10 @@
 #pragma semicolon 1
 
 #include <sourcemod>
-//#include <dhooks>
 #include <morecolors>
 #include <mgeme/players>
 #include <mgeme/arenas>
+#include <mgeme/database>
 
 #pragma newdecls required
 
@@ -53,6 +53,8 @@ public Plugin myinfo =
 Handle HUDScore,
        HUDArena,
        HUDBanner;
+
+bool HasDB;
 
 /**
  * =============================================================================
@@ -119,6 +121,11 @@ public void OnPluginStart()
 */
 }
 
+public void OnConfigsExecuted()
+{
+        HasDB = DBConnect();
+}
+
 public void OnMapInit(const char[] mapName)
 {
         LoadMapConfig(MGEME_CONFIG, mapName);
@@ -130,16 +137,50 @@ public void OnMapStart()
         SetConVarInt(FindConVar("mp_autoteambalance"), 0);
 }
 
-public void OnClientPostAdminCheck(int client)
+public void OnClientConnected(int client)
 {
         PlayerList[client] = new Player(client);
+}
+
+public void OnClientPutInServer(int client)
+{
         CreateTimer(10.0, Timer_WelcomeMsg1, GetClientSerial(client));
         CreateTimer(7.0, Timer_Warning, GetClientSerial(client));
+}
+
+public void OnClientPostAdminCheck(int client)
+{
+        if (HasDB)
+        {
+                char SteamId[32], SteamIdClean[32], Query[255];
+
+                GetClientAuthId(client, AuthId_Steam2, SteamId, sizeof(SteamId));
+                gDB.Escape(SteamId, SteamIdClean, sizeof(SteamIdClean));
+
+                Format(Query, sizeof(Query), "SELECT elo, wins, losses FROM mgeme_stats WHERE \
+                                              steamid='%s' LIMIT 1", SteamIdClean);
+
+                gDB.Query(SQLQueryOnAuth, Query, client);
+        }
 }
 
 public void OnClientDisconnect(int client)
 {
         RemovePlayerFromArena(client, false);
+
+        if (IsClientAuthorized(client) && HasDB && PlayerList[client].FromDatabase)
+        {
+                char SteamId[32], SteamIdClean[32], Query[255];
+
+                GetClientAuthId(client, AuthId_Steam2, SteamId, sizeof(SteamId));
+                gDB.Escape(SteamId, SteamIdClean, sizeof(SteamIdClean));
+
+                Format(Query, sizeof(Query), "UPDATE mgeme_stats SET elo=%i, wins=%i, losses=%i \
+                                              WHERE steamid='%s'", PlayerList[client].Elo,
+                                              PlayerList[client].Wins, PlayerList[client].Losses, SteamIdClean);
+
+                gDB.Query(SQLQueryUpdatePlayer, Query);
+        }
 }
 
 /**
@@ -1573,6 +1614,74 @@ public Action Event_RoundWin_Post(Event ev, const char[] name, bool dontBroadcas
         CreateTimer(float(arena.CDTime), Timer_Match_End, arena);
 
         return Plugin_Handled;
+}
+
+/**
+ * =============================================================================
+ * DATABASE FUNCTIONS
+ * =============================================================================
+ */
+
+void SQLQueryOnAuth(Database db, DBResultSet result, const char[] error, any data)
+{
+        int client = data;
+
+        if (result == null || strlen(error) > 0)
+        {
+                LogError("SQLQueryOnAuth error : %s", error);
+                return;
+        }
+
+        if (!IsClientConnected(client))
+        {
+                LogError("SQLQueryOnAuth client %i not connected", client);
+                return;
+        }
+
+        if (result.FetchRow())
+        {
+                PlayerList[client].Elo = result.FetchInt(0);
+                PlayerList[client].Wins = PlayerList[client].Wins + result.FetchInt(1);
+                PlayerList[client].Losses = PlayerList[client].Losses + result.FetchInt(2);
+                PlayerList[client].FromDatabase = true;
+        }
+        else
+        {
+                char SteamId[32], SteamIdClean[32], Query[255];
+
+                GetClientAuthId(client, AuthId_Steam2, SteamId, sizeof(SteamId));
+                gDB.Escape(SteamId, SteamIdClean, sizeof(SteamIdClean));
+
+                Format(Query, sizeof(Query), "INSERT INTO mgeme_stats VALUES('%s', %i, %i, %i, %i)", 
+                                              SteamIdClean, GetTime(), PlayerList[client].Elo,
+                                              PlayerList[client].Wins, PlayerList[client].Losses);
+
+                gDB.Query(SQLQueryInsertPlayer, Query, client);
+        }
+}
+
+void SQLQueryInsertPlayer(Database db, DBResultSet result, const char[] error, any data)
+{
+        int client = data;
+
+        if (strlen(error) > 0)
+        {
+                LogError("SQLQueryInsertPlayer error: %s", error);
+        }
+        else
+        {
+                PlayerList[client].FromDatabase = true;
+        }
+}
+
+void SQLQueryUpdatePlayer(Database db, DBResultSet result, const char[] error, any data)
+{
+        int client = data;
+
+        if (strlen(error) > 0)
+        {
+                LogError("SQLQueryUpdatePlayer error: %s", error);
+        }
 }
 
 /**
