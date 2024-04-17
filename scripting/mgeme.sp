@@ -68,11 +68,11 @@ public void OnPluginStart()
         {
                 SetFailState("MaxClients is %i. See 'players.inc'", MAX_PLAYERS);
         }
-
 #if defined _DEBUG
         RegAdminCmd("runtests", Admin_Command_RunTests, 1, "Run test set.");
         RegAdminCmd("fakeclients", Admin_Command_CreateFakeClients, 1, "Spawn fake clients.");
         RegAdminCmd("refresh", Admin_Command_Refresh, 1);
+        RegAdminCmd("setstats", Admin_Command_SetStats, 1);
 #endif
         RegConsoleCmd("add", Command_Add, "Usage: add <arena number/arena name>. Join an arena.");
         RegConsoleCmd("remove", Command_Remove, "Leave the current arena or queue.");
@@ -426,6 +426,18 @@ Action Admin_Command_Refresh(int client, int args)
 
         _Player.RefreshAmmo();
         _Player.RefreshHP(1.5);
+
+        return Plugin_Handled;
+}
+
+Action Admin_Command_SetStats(int client, int args)
+{
+        if (args == 3)
+        {
+                PlayerList[client].Elo = GetCmdArgInt(1);
+                PlayerList[client].Wins = GetCmdArgInt(2);
+                PlayerList[client].Losses = GetCmdArgInt(3);
+        }
 
         return Plugin_Handled;
 }
@@ -1633,6 +1645,9 @@ void SQLQueryOnAuth(Database db, DBResultSet result, const char[] error, any dat
 
         if (result.FetchRow())
         {
+#if defined _DEBUG
+                LogMessage("SQL fetching player data");
+#endif
                 PlayerList[client].Elo = result.FetchInt(0);
                 PlayerList[client].Wins = PlayerList[client].Wins + result.FetchInt(1);
                 PlayerList[client].Losses = PlayerList[client].Losses + result.FetchInt(2);
@@ -1643,7 +1658,7 @@ void SQLQueryOnAuth(Database db, DBResultSet result, const char[] error, any dat
                 char SteamId[32], Query[255];
                 GetClientAuthId(client, AuthId_Steam2, SteamId, sizeof(SteamId));
 #if defined _DEBUG
-                PrintToChatAll("new db entry: SteamId: %s", SteamId);
+                LogMessage("New DB entry: SteamId: %s", SteamId);
 #endif
                 Format(Query, sizeof(Query), "INSERT INTO mgeme_stats VALUES('%s', %i, %i, %i, %i)", 
                                               SteamId, GetTime(), PlayerList[client].Elo,
@@ -1656,7 +1671,9 @@ void SQLQueryOnAuth(Database db, DBResultSet result, const char[] error, any dat
 void SQLQueryInsertPlayer(Database db, DBResultSet result, const char[] error, any data)
 {
         int client = data;
-
+#if defined _DEBUG
+        LogMessage("SQLQueryInsertPlayer");
+#endif
         if (db == null || strlen(error) > 0)
         {
                 LogError("SQLQueryInsertPlayer error: %s", error);
@@ -1669,6 +1686,9 @@ void SQLQueryInsertPlayer(Database db, DBResultSet result, const char[] error, a
 
 void SQLQueryUpdatePlayer(Database db, DBResultSet result, const char[] error, any data)
 {
+#if defined _DEBUG
+        LogMessage("SQLQueryUpdatePlayer");
+#endif
         if (db == null || strlen(error) > 0)
         {
                 LogError("SQLQueryUpdatePlayer error: %s", error);
