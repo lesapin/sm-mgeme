@@ -30,7 +30,7 @@
 
 #pragma newdecls required
 
-#define PL_VER "0.8.9"
+#define PL_VER "0.9.0"
 #define PL_DESC "A complete rewrite of MGEMod by Lange"
 #define PL_URL "https://mge.me"
 
@@ -1626,15 +1626,14 @@ void SQLQueryOnAuth(Database db, DBResultSet result, const char[] error, any dat
 {
         int client = data;
 
-        if (result == null || strlen(error) > 0)
+        if (!IsClientConnected(client))
         {
-                LogError("SQLQueryOnAuth error : %s", error);
                 return;
         }
 
-        if (!IsClientConnected(client))
+        if (db == null || result == null || strlen(error) > 0)
         {
-                LogError("SQLQueryOnAuth client %i not connected", client);
+                LogError("SQLQueryOnAuth error : %s", error);
                 return;
         }
 
@@ -1664,7 +1663,7 @@ void SQLQueryInsertPlayer(Database db, DBResultSet result, const char[] error, a
 {
         int client = data;
 
-        if (strlen(error) > 0)
+        if (db == null || strlen(error) > 0)
         {
                 LogError("SQLQueryInsertPlayer error: %s", error);
         }
@@ -1676,9 +1675,7 @@ void SQLQueryInsertPlayer(Database db, DBResultSet result, const char[] error, a
 
 void SQLQueryUpdatePlayer(Database db, DBResultSet result, const char[] error, any data)
 {
-        int client = data;
-
-        if (strlen(error) > 0)
+        if (db == null || strlen(error) > 0)
         {
                 LogError("SQLQueryUpdatePlayer error: %s", error);
         }
