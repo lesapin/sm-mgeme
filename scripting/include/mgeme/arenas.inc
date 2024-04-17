@@ -1260,7 +1260,7 @@ ArenaState UpdateState(Arena arena, ArenaState newState)
                         ev.SetInt("full_round", view_as<int>(arena));
                         ev.Fire();
                         
-                        CreateTimer(0.6, Timer_End_Cooldown, arena);
+                        CreateTimer(0.4, Timer_End_Cooldown, arena);
                         return Arena_Ended;
                 }
         }
@@ -1272,6 +1272,6 @@ ArenaState UpdateState(Arena arena, ArenaState newState)
 static Action Timer_End_Cooldown(Handle timer, Arena arena)
 {
         arena.State = Arena_PlayerChange;
-        arena.State = UpdateState(arena, Arena_PlayerChange);
+        //arena.State = UpdateState(arena, Arena_PlayerChange);
         return Plugin_Stop;
 }

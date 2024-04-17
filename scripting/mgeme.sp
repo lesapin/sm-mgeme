@@ -73,6 +73,7 @@ public void OnPluginStart()
         RegAdminCmd("fakeclients", Admin_Command_CreateFakeClients, 1, "Spawn fake clients.");
         RegAdminCmd("refresh", Admin_Command_Refresh, 1);
         RegAdminCmd("setstats", Admin_Command_SetStats, 1);
+        RegAdminCmd("addclient", Admin_Command_AddClient, 1);
 #endif
         RegConsoleCmd("add", Command_Add, "Usage: add <arena number/arena name>. Join an arena.");
         RegConsoleCmd("remove", Command_Remove, "Leave the current arena or queue.");
@@ -441,6 +442,17 @@ Action Admin_Command_SetStats(int client, int args)
 
         return Plugin_Handled;
 }
+
+Action Admin_Command_AddClient(int client, int args)
+{
+        if (args == 2)
+        {
+                RemovePlayerFromArena(GetCmdArgInt(1), false);
+                AddPlayerToArena(GetCmdArgInt(1), GetCmdArgInt(2));
+        }
+
+        return Plugin_Handled;
+}
 #endif
 
 /**
@@ -520,6 +532,7 @@ void RemovePlayerFromArena(int client, bool forceSuicide = true)
                         if (_Arena.MatchOngoing())
                         {
                                 MatchOver(_Arena, client);
+                                UpdateArenaHUDs(_Arena);
                         }
 
                         if (forceSuicide)
@@ -884,22 +897,22 @@ void UpdateArenaHUDs(Arena arena)
 
         if (Red1.IsValid)
         {
-                UpdateHUD(arena, arena.REDPlayer1, true, false);
+                UpdateHUD(arena, arena.REDPlayer1, true, true);
         }
         
         if (Red2.IsValid)
         {
-                UpdateHUD(arena, arena.REDPlayer2, true, false);
+                UpdateHUD(arena, arena.REDPlayer2, true, true);
         }
         
         if (Blu1.IsValid)
         {
-                UpdateHUD(arena, arena.BLUPlayer1, true, false);
+                UpdateHUD(arena, arena.BLUPlayer1, true, true);
         }
 
         if (Blu2.IsValid)
         {
-                UpdateHUD(arena, arena.BLUPlayer2, true, false);
+                UpdateHUD(arena, arena.BLUPlayer2, true, true);
         }
 
         if (arena.NumSpectators > 0)
@@ -1424,7 +1437,7 @@ public Action Event_PlayerSpawn_Post(Event ev, const char[] name, bool dontBroad
         _Player.ClipPrimary = Slot0 > -1 ? GetEntProp(Slot0, Prop_Data, "m_iClip1") : 0;
         _Player.ClipSecondary = Slot1 > -1 ? GetEntProp(Slot1, Prop_Data, "m_iClip1") : 0;
         
-        CreateTimer(0.5, Timer_UpdateHUDAfterRespawn, client);
+        CreateTimer(0.8, Timer_UpdateHUDAfterRespawn, client);
         //UpdateHUDNextFrame(client);
         //UpdateHUD(_Arena, client);
 
@@ -1491,7 +1504,7 @@ public Action Event_PlayerTeam_Post(Event ev, const char[] name, bool dontBroadc
         }
 
         //UpdateHUD(_Arena, client, true, false);
-        CreateTimer(0.5, Timer_UpdateHUDAfterRespawn, client);
+        //CreateTimer(0.5, Timer_UpdateHUDAfterRespawn, client);
        
         return Plugin_Continue;
 }
@@ -1617,7 +1630,7 @@ public Action Event_RoundWin_Post(Event ev, const char[] name, bool dontBroadcas
                 arena.BLUElo = arena.BLUElo / 2;
         }
 
-        CreateTimer(float(arena.CDTime), Timer_Match_End, arena);
+        CreateTimer(1.7, Timer_Match_End, arena);
 
         return Plugin_Handled;
 }

@@ -39,13 +39,13 @@ bool DBConnect()
         }
         else
         {
-                LogMessage("Named configuration <mgeme> doesn't exist, using default config");
+                LogMessage("Named DB configuration <mgeme> doesn't exist, using default config");
                 gDB = SQL_DefConnect(error, sizeof(error));
         }
 
         if (gDB == null)
         {
-                LogError("Connecting to database failed, %s", error);
+                LogError("Connecting to database failed <%s>", error);
                 return false;
         }
 
