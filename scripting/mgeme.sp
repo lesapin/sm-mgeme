@@ -152,13 +152,10 @@ public void OnClientPostAdminCheck(int client)
 {
         if (HasDB)
         {
-                char SteamId[32], SteamIdClean[32], Query[255];
-
+                char SteamId[32], Query[255];
                 GetClientAuthId(client, AuthId_Steam2, SteamId, sizeof(SteamId));
-                gDB.Escape(SteamId, SteamIdClean, sizeof(SteamIdClean));
-
                 Format(Query, sizeof(Query), "SELECT elo, wins, losses FROM mgeme_stats WHERE \
-                                              steamid='%s' LIMIT 1", SteamIdClean);
+                                              steamid='%s' LIMIT 1", SteamId);
 
                 gDB.Query(SQLQueryOnAuth, Query, client);
         }
@@ -170,14 +167,11 @@ public void OnClientDisconnect(int client)
 
         if (IsClientAuthorized(client) && HasDB && PlayerList[client].FromDatabase)
         {
-                char SteamId[32], SteamIdClean[32], Query[255];
-
+                char SteamId[32], Query[255];
                 GetClientAuthId(client, AuthId_Steam2, SteamId, sizeof(SteamId));
-                gDB.Escape(SteamId, SteamIdClean, sizeof(SteamIdClean));
-
                 Format(Query, sizeof(Query), "UPDATE mgeme_stats SET elo=%i, wins=%i, losses=%i \
                                               WHERE steamid='%s'", PlayerList[client].Elo,
-                                              PlayerList[client].Wins, PlayerList[client].Losses, SteamIdClean);
+                                              PlayerList[client].Wins, PlayerList[client].Losses, SteamId);
 
                 gDB.Query(SQLQueryUpdatePlayer, Query);
         }
@@ -1646,13 +1640,13 @@ void SQLQueryOnAuth(Database db, DBResultSet result, const char[] error, any dat
         }
         else
         {
-                char SteamId[32], SteamIdClean[32], Query[255];
-
+                char SteamId[32], Query[255];
                 GetClientAuthId(client, AuthId_Steam2, SteamId, sizeof(SteamId));
-                gDB.Escape(SteamId, SteamIdClean, sizeof(SteamIdClean));
-
+#if defined _DEBUG
+                PrintToChatAll("new db entry: SteamId: %s", SteamId);
+#endif
                 Format(Query, sizeof(Query), "INSERT INTO mgeme_stats VALUES('%s', %i, %i, %i, %i)", 
-                                              SteamIdClean, GetTime(), PlayerList[client].Elo,
+                                              SteamId, GetTime(), PlayerList[client].Elo,
                                               PlayerList[client].Wins, PlayerList[client].Losses);
 
                 gDB.Query(SQLQueryInsertPlayer, Query, client);
