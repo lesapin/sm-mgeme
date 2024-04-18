@@ -48,6 +48,12 @@ bool HasDB;
 public void OnPluginStart()
 {
         RegAdminCmd("serverstats", Admin_Command_ServerStats, 1, "Dump server stats and drop table.");
+        
+        CreateHandler(USR1, DumpStats);
+
+        ActiveTime = 0;
+        ActiveStart = 0;
+        MaxPlayers = 0;
 }
 
 public void OnConfigsExecuted()
@@ -55,19 +61,21 @@ public void OnConfigsExecuted()
         if ((HasDB = DBConnect()))
         {
                 DBInitServerStats();
-                CreateHandler(USR1, DumpStats);
         }
         else
         {
                 SetFailState("Couldn't connect to database");
-        }        
-
-        ActiveTime = 0;
-        MaxPlayers = GetClientCount();
-
+        }
+        
         char FilePath[256];
         BuildPath(Path_SM, FilePath, sizeof(FilePath), "data/servermonitor.dat");
-        File file = OpenFile(FilePath, "r");
+
+        File file;
+
+        if (FileExists(FilePath))
+        {
+                file = OpenFile(FilePath, "r");
+        }
 
         if (file)
         {
@@ -88,15 +96,6 @@ public void OnConfigsExecuted()
         
         delete file;
         DeleteFile(FilePath);
-
-        if (GetClientCount() > 0)
-        {
-                ActiveStart = GetTime();
-        }
-        else
-        {
-                ActiveStart = 0;
-        }
 }
 
 public void OnClientConnected(int client)
