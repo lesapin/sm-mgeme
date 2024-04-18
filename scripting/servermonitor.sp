@@ -1,346 +1,281 @@
-#include <signals>
-#include <sourcemod>
+/**
+ * =============================================================================
+ * MGEME
+ * A rewrite of MGEMOD for MGE.ME server. Server monitoring tool.
+ *
+ * (C) 2024 MGE.ME.  All rights reserved.
+ * =============================================================================
+ *
+ * This program is free software; you can redistribute it and/or modify it under
+ * the terms of the GNU General Public License, version 3.0, as published by the
+ * Free Software Foundation.
+ * 
+ * This program is distributed in the hope that it will be useful, but WITHOUT
+ * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS
+ * FOR A PARTICULAR PURPOSE.  See the GNU General Public License for more
+ * details.
+ *
+ * You should have received a copy of the GNU General Public License along with
+ * this program.  If not, see <http://www.gnu.org/licenses/>.
+ *
+ */
 
-#define PLUGIN_VERSION "1.2.5"
+#include <sourcemod>
+#include <signals>
+#include <mgeme/database>
+
+#define PLUGIN_VERSION "2.0.0"
 
 public Plugin myinfo = 
 {
-    name = "Server Monitor",
-    author = "bzdmn",
-    description = "Monitor server usage",
-    version = PLUGIN_VERSION,
-    url = "https://mge.me"
+        name = "Server Monitor",
+        author = "bzdmn",
+        description = "Monitor server usage",
+        version = PLUGIN_VERSION,
+        url = "https://mge.me"
 };
 
 #define MAX_PLAYER_SLOTS 25
-#define DUMP_CYCLE       24 // dump stats every x hours
 
-#define TMPPLAYERS "data/uniqueplayers.tmp"
-#define TMPSTATS   "data/serverstats.tmp"
+int JoinTime[MAX_PLAYER_SLOTS];
 
-StringMap   UniquePlayers;
+int ActiveTime,
+    ActiveStart,
+    MaxPlayers;
 
-int         PlaytimeStore[MAX_PLAYER_SLOTS];
+bool HasDB;
 
-int         MAX_CLIENTS  = 0,
-            CUR_CLIENTS  = 0,
-            CONNECTIONS  = 0,
-            ACTIVE_TIME  = 0,
-            FIRST_PLAYER = 0;
-
-/*** ONPLUGIN FUNCTIONS ***/
-
-public void OnPluginStart() 
+public void OnPluginStart()
 {
-    UniquePlayers = new StringMap();
-
-    char FilePath[256];
-
-    // import UniquePlayers from tmpfile
-    BuildPath(Path_SM, FilePath, sizeof(FilePath), TMPPLAYERS);
-    
-    if (FileExists(FilePath))
-    {
-        File tmpfile = OpenFile(FilePath, "r");
-
-        if (tmpfile)
-        {
-            char steamid[18]; //ignore newline
-            int timestamp, playtime;
-
-            tmpfile.ReadInt32(timestamp);
-
-            if ((GetTime() - timestamp) < DUMP_CYCLE * 60 * 60)
-            {
-                while (!tmpfile.EndOfFile())
-                {
-                    tmpfile.ReadInt32(playtime);
-                    tmpfile.ReadLine(steamid, sizeof(steamid));
-
-                    if (playtime > 0)
-                        UniquePlayers.SetValue(steamid, playtime, true);
-                }
-
-                LogMessage("Imported UniquePlayers from %s", FilePath);
-            }
-            else
-                LogMessage("%s is old, not importing", FilePath);
-        }
-        else
-            LogError("Couldn't import UniquePlayers from %s", FilePath);
-
-        delete tmpfile;
-        DeleteFile(FilePath);
-    }
-
-    // import serverstats from tmpfile
-    BuildPath(Path_SM, FilePath, sizeof(FilePath), TMPSTATS);
-
-    if (FileExists(FilePath))
-    {
-        File tmpfile = OpenFile(FilePath, "r");
-
-        if (tmpfile)
-        {
-            int timestamp;
-            tmpfile.ReadInt32(timestamp);
-
-            if ((GetTime() - timestamp) < DUMP_CYCLE * 60 * 60)
-            {
-                tmpfile.ReadInt32(MAX_CLIENTS);
-                tmpfile.ReadInt32(CONNECTIONS);
-                tmpfile.ReadInt32(ACTIVE_TIME);
-    
-                LogMessage("Imported server stats from %s", FilePath);
-            }
-            else
-                LogMessage("%s is old, not importing", FilePath);
-
-        }
-        else
-            LogError("Couldn't import serverstats from %s", FilePath);
-
-        delete tmpfile;
-        DeleteFile(FilePath);
-    }
-
-        RegServerCmd("serverstats", DumpStats_Cmd);
-
-        CreateHandler(USR1, DumpStats_Callback);
-        LogMessage("Attached callback for signal USR1");
-
-        CUR_CLIENTS = GetClientCount(true);
-
-        if (CUR_CLIENTS)
-        {
-                FIRST_PLAYER = GetTime();
-        }
+        RegAdminCmd("serverstats", Admin_Command_ServerStats, 1, "Dump server stats and drop table.");
+        
+        ActiveStart = 0;
+        ActiveTime = 0;
+        MaxPlayers = 0;
 }
 
-// plugin is (re/un)loaded during a dump cycle, export UniquePlayers 
-public void OnPluginEnd()
+public void OnConfigsExecuted()
 {
-        char FilePath[256];
-        BuildPath(Path_SM, FilePath, sizeof(FilePath), TMPPLAYERS);
-
-        File tmpfile = OpenFile(FilePath, "w");
-
-        if (tmpfile)
+        if ((HasDB = DBConnect()))
         {
-                StringMapSnapshot snapshot = UniquePlayers.Snapshot();
-                char steamid[64];
-                int playtime;
-
-                tmpfile.WriteInt32(GetTime()); //timestamp
-
-                for (int i = 0; i < snapshot.Length; i++)
-                {
-                        snapshot.GetKey(i, steamid, sizeof(steamid));
-                        UniquePlayers.GetValue(steamid, playtime);
-        
-                        tmpfile.WriteInt32(playtime);
-                        tmpfile.WriteLine(steamid);
-                }
-
-                delete snapshot;
+                DBInitServerStats();
+                CreateHandler(USR1, DumpStats);
         }
         else
         {
-                LogError("Couldn't export UniquePlayers to %s", FilePath);
+                SetFailState("Couldn't connect to database");
         }
-
-        tmpfile.Close();
-
-        // export serverstats to tmpfile
-        BuildPath(Path_SM, FilePath, sizeof(FilePath), TMPSTATS);
-
-        tmpfile = OpenFile(FilePath, "w");
-
-        if (tmpfile)
-        {
-                tmpfile.WriteInt32(GetTime()); //timestamp
-
-                tmpfile.WriteInt32(MAX_CLIENTS);
-                tmpfile.WriteInt32(CONNECTIONS);
-                tmpfile.WriteInt32(ACTIVE_TIME);
-        }
-        else
-        {
-                LogError("Couldn't export serverstats to %s", FilePath);
-        }
-        
-        delete tmpfile;
 }
-
-/*** ONCLIENT FUNCTIONS ***/
 
 public void OnClientConnected(int client)
 {
-        CUR_CLIENTS++;
-
-        if (CUR_CLIENTS > MAX_CLIENTS)
+        if (ActiveStart == 0)
         {
-                MAX_CLIENTS = CUR_CLIENTS;
+                ActiveStart = GetTime();
         }
 
-        if (CUR_CLIENTS == 1)
+        if (GetClientCount(false) > MaxPlayers)
         {
-                FIRST_PLAYER = GetTime();
+                MaxPlayers = GetClientCount(false);
         }
 
-        ++CONNECTIONS;
-}
-
-public void OnClientPostAdminCheck(int client)
-{
-        char steamid[64];
-        GetClientAuthId(client, AuthId_SteamID64, steamid, sizeof(steamid));
-
-        // Insert a unique player or update their entry
-        if (!UniquePlayers.SetValue(steamid, GetTime(), false))
-        {
-                UniquePlayers.GetValue(steamid, PlaytimeStore[client]);
-                UniquePlayers.SetValue(steamid, GetTime(), true);
-        }
+        JoinTime[client] = GetTime();
 }
 
 public void OnClientDisconnect(int client)
 {
-        char steamid[32] = "";
-        
-        if (IsClientAuthorized(client))
+        if (HasDB && IsClientAuthorized(client))
         {
-                GetClientAuthId(client, AuthId_SteamID64, steamid, sizeof(steamid));
-    
-                int ConnectionTime;
+                UpdatePlayer(client);
+        }
+}
 
-                if (UniquePlayers.GetValue(steamid, ConnectionTime))
+public void OnClientDisconnect_Post(int client)
+{
+        if (GetClientCount() == 0)
+        {
+                ActiveTime += (GetTime() - ActiveStart);
+                ActiveStart = 0;
+        }
+
+        JoinTime[client] = 0;
+}
+
+public void OnPluginEnd()
+{
+        if (HasDB)
+        {
+                for (int i = 1; i <= MaxClients; i++)
                 {
-                        UniquePlayers.SetValue(steamid, (GetTime() - ConnectionTime) + PlaytimeStore[client]);
-                }
-        }
-
-        PlaytimeStore[client] = 0;
-
-        CUR_CLIENTS--;
-
-        if (!CUR_CLIENTS)
-        {
-                ACTIVE_TIME += GetTime() - FIRST_PLAYER;
-        }
-}
-
-/*** CALLBACK FUNCTIONS ***/
-
-Action DumpStats_Cmd(int args)
-{
-        if (!args)
-        {
-                char tmp[32];
-                FormatTime(tmp, sizeof(tmp), "L%G%m%d", GetTime());
-
-                DumpStats(tmp);
-        }
-
-        return Plugin_Handled;
-}
-
-Action DumpStats_Callback()
-{
-        char tmp[32];
-        FormatTime(tmp, sizeof(tmp), "L%G%m%d", GetTime());
-    
-        DumpStats(tmp);
-        ResetStats();
-
-        return Plugin_Handled;
-}
-
-/*** PRIVATE FUNCTIONS ***/
-
-bool DumpStats(const char[] filename)
-{
-        char FilePath[256];
-        BuildPath(Path_SM, FilePath, sizeof(FilePath), "logs/%s.stats", filename);
-
-        File f = OpenFile(FilePath, "w");
-
-        if (f)
-        {
-                char steamid[32];
-                int playtime;
-                int totalPlaytime = 0;
-        
-                StringMapSnapshot snapshot = UniquePlayers.Snapshot();
-
-                for (int i = 0; i < snapshot.Length; i++)
-                {
-                        snapshot.GetKey(i, steamid, sizeof(steamid));
-                        UniquePlayers.GetValue(steamid, playtime);
-        
-                        if (playtime > DUMP_CYCLE * 60 * 60)
+                        if (IsClientConnected(i) && IsClientAuthorized(i))
                         {
-                                playtime = GetTime() - playtime;
+                                UpdatePlayer(i);
                         }
-                        
-                        totalPlaytime += playtime;
-                        WriteFileLine(f, "PLAYER %s %i", steamid, playtime);
                 }
+        }
+}
 
-                for (int i = 0; i < MAX_PLAYER_SLOTS; i++)
-                {
-                        totalPlaytime += PlaytimeStore[i];
-                }
+void UpdatePlayer(int client)
+{
+        char Query[256], SteamId[32];
+        
+        GetClientAuthId(client, AuthId_Steam2, SteamId, sizeof(SteamId));
 
-                WriteFileLine(f, "MANHOURS %i", totalPlaytime);
+        DataPack pack = new DataPack();
+        pack.WriteString(SteamId);
+        pack.WriteCell(GetTime() - JoinTime[client]);
 
-                if (!CUR_CLIENTS)
-                {
-                        WriteFileLine(f, "ACTIVETIME %i", ACTIVE_TIME);
-                }
-                else
-                {
-                        WriteFileLine(f, "ACTIVETIME %i", ACTIVE_TIME + (GetTime() - FIRST_PLAYER));
-                }
+        Format(Query, sizeof(Query), "SELECT playtime, playtime_total, connections \
+                                      FROM mgeme_server \
+                                      WHERE steamid='%s' LIMIT 1", SteamId);
 
-                WriteFileLine(f, "MAXCLIENTS %i", MAX_CLIENTS);
-                WriteFileLine(f, "UNIQUECLIENTS %i", snapshot.Length);
-                WriteFileLine(f, "CONNECTIONS %i", CONNECTIONS);
+        gDB.Query(SQLQueryUpdateServerStats, Query, pack);
+}
 
-                LogMessage("Dumped server stats in %s", FilePath);
+void SQLQueryUpdateServerStats(Database db, DBResultSet result, const char[] error, any data)
+{
+        if (db == null || result == null || strlen(error) > 0)
+        {
+                LogError("SQLQueryUpdateServerStats error: %s", error);
+                return;
+        }
 
-                delete snapshot;
+        char Query[256], SteamId[32], Date[32];
+
+        DataPack pack = data;
+        pack.Reset();
+        
+        pack.ReadString(SteamId, sizeof(SteamId));
+
+        int playtime = pack.ReadCell();
+        int playtime_total = playtime;
+        int connections = 1;
+
+        delete pack;
+
+        FormatTime(Date, sizeof(Date), "%D", GetTime());
+
+        if (result.FetchRow())
+        {
+                playtime += result.FetchInt(0);
+                playtime_total += result.FetchInt(1);                
+                connections += result.FetchInt(2);
+
+                Format(Query, sizeof(Query), "UPDATE mgeme_server \
+                                              SET date='%s', playtime=%i, playtime_total=%i, connections=%i \
+                                              WHERE steamid='%s'",
+                                              Date, playtime, playtime_total, connections, SteamId);
+
+                gDB.Query(SQLQueryErrorCheck, Query);
         }
         else
         {
-                LogError("Unable to open file %s", FilePath);
-                return false;
-        }
+                Format(Query, sizeof(Query), "INSERT INTO mgeme_server VALUES('%s', '%s', %i, %i, %i)",
+                                              SteamId, Date, playtime, playtime_total, connections);
 
-        delete f;
-        return true;
+                gDB.Query(SQLQueryErrorCheck, Query);
+        }
 }
 
-void ResetStats()
+Action Admin_Command_ServerStats(int client, int args)
 {
-        CONNECTIONS = CUR_CLIENTS;
-        MAX_CLIENTS = CUR_CLIENTS;
-
-        if (CUR_CLIENTS)
+        if (HasDB)
         {
-                FIRST_PLAYER = GetTime();
+                DumpStats();
         }
 
-        StringMapSnapshot snapshot = UniquePlayers.Snapshot();
-        UniquePlayers.Clear();
+        return Plugin_Continue;
+}
 
-        char steamid[64]; 
+Action DumpStats()
+{
+        char FilePath[256], FileName[64], Date[32];
 
-        for (int i = 0; i < snapshot.Length; i++)
+        int UniqueConnections, Playtime = 0, Connections = 0;
+
+        FormatTime(Date, sizeof(Date), "%D", GetTime());
+        FormatTime(FileName, sizeof(FileName), "L%G%m%d", GetTime());
+        
+        BuildPath(Path_SM, FilePath, sizeof(FilePath), "logs/%s.stats", FileName);
+
+        if (HasDB)
         {
-                snapshot.GetKey(i, steamid, sizeof(steamid));
-                UniquePlayers.SetValue(steamid, GetTime(), true);
+                for (int i = 1; i <= MaxClients; i++)
+                {
+                        if (IsClientConnected(i) && IsClientAuthorized(i))
+                        {
+                                UpdatePlayer(i);
+                        }
+                }
         }
 
-        delete snapshot;
+        File file = OpenFile(FilePath, "a");
+
+        if (file)
+        {
+                char Query[256];
+
+                Format(Query, sizeof(Query), "SELECT playtime, connections FROM mgeme_server \
+                                              WHERE date='%s'", Date);
+
+                SQL_LockDatabase(gDB);
+
+                DBResultSet Q = SQL_Query(gDB, Query);
+
+                if (Q == null)
+                {
+                        char error[256];
+                        SQL_GetError(Q, error, sizeof(error))
+                        LogError("DumpStats error: %s", error);
+                        
+                        SQL_UnlockDatabase(gDB);
+                        
+                        return Plugin_Continue;
+                }
+
+                UniqueConnections = Q.RowCount;
+                
+                while (Q.FetchRow())
+                {
+                        Playtime += Q.FetchInt(0);
+                        Connections += Q.FetchInt(1);
+                }
+
+                if (SQL_FastQuery(gDB, "DROP TABLE mgeme_server"))
+                {
+                        SQL_FastQuery(gDB, "CREATE TABLE mgeme_server (steamid TEXT, date TEXT, \
+                                            playtime INTEGER, playtime_total INTEGER, connections INTEGER)");
+                }
+
+                SQL_UnlockDatabase(gDB);
+
+                delete Q;
+
+                if (ActiveStart > 0)
+                {
+                        ActiveTime += (GetTime() - ActiveStart);
+                }
+
+                file.WriteLine("ACTIVETIME %i", ActiveTime);
+                file.WriteLine("MAXCLIENTS %i", MaxPlayers);
+                file.WriteLine("UNIQUECLIENTS %i", UniqueConnections);
+                file.WriteLine("CONNECTIONS %i", Connections);
+                file.WriteLine("MANHOURS %i", Playtime);
+        }
+
+        delete file;
+
+        ActiveTime = 0;
+        MaxPlayers = GetClientCount();
+
+        if (MaxPlayers > 0)
+        {
+                ActiveStart = GetTime();
+        }
+        else
+        {
+                ActiveStart = 0;
+        }
+
+        return Plugin_Continue;
 }
