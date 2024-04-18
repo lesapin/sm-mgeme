@@ -155,6 +155,7 @@ public void OnClientPostAdminCheck(int client)
         {
                 char SteamId[32], Query[255];
                 GetClientAuthId(client, AuthId_Steam2, SteamId, sizeof(SteamId));
+                
                 Format(Query, sizeof(Query), "SELECT elo, wins, losses FROM mgeme_stats WHERE \
                                               steamid='%s' LIMIT 1", SteamId);
 
@@ -170,11 +171,12 @@ public void OnClientDisconnect(int client)
         {
                 char SteamId[32], Query[255];
                 GetClientAuthId(client, AuthId_Steam2, SteamId, sizeof(SteamId));
+
                 Format(Query, sizeof(Query), "UPDATE mgeme_stats SET elo=%i, wins=%i, losses=%i \
                                               WHERE steamid='%s'", PlayerList[client].Elo,
                                               PlayerList[client].Wins, PlayerList[client].Losses, SteamId);
 
-                gDB.Query(SQLQueryUpdatePlayer, Query);
+                gDB.Query(SQLQueryErrorCheck, Query);
         }
 }
 
@@ -1658,9 +1660,6 @@ void SQLQueryOnAuth(Database db, DBResultSet result, const char[] error, any dat
 
         if (result.FetchRow())
         {
-#if defined _DEBUG
-                LogMessage("SQL fetching player data");
-#endif
                 PlayerList[client].Elo = result.FetchInt(0);
                 PlayerList[client].Wins = PlayerList[client].Wins + result.FetchInt(1);
                 PlayerList[client].Losses = PlayerList[client].Losses + result.FetchInt(2);
@@ -1670,9 +1669,7 @@ void SQLQueryOnAuth(Database db, DBResultSet result, const char[] error, any dat
         {
                 char SteamId[32], Query[255];
                 GetClientAuthId(client, AuthId_Steam2, SteamId, sizeof(SteamId));
-#if defined _DEBUG
-                LogMessage("New DB entry: SteamId: %s", SteamId);
-#endif
+
                 Format(Query, sizeof(Query), "INSERT INTO mgeme_stats VALUES('%s', %i, %i, %i, %i)", 
                                               SteamId, GetTime(), PlayerList[client].Elo,
                                               PlayerList[client].Wins, PlayerList[client].Losses);
@@ -1684,9 +1681,7 @@ void SQLQueryOnAuth(Database db, DBResultSet result, const char[] error, any dat
 void SQLQueryInsertPlayer(Database db, DBResultSet result, const char[] error, any data)
 {
         int client = data;
-#if defined _DEBUG
-        LogMessage("SQLQueryInsertPlayer");
-#endif
+
         if (db == null || strlen(error) > 0)
         {
                 LogError("SQLQueryInsertPlayer error: %s", error);
@@ -1694,17 +1689,6 @@ void SQLQueryInsertPlayer(Database db, DBResultSet result, const char[] error, a
         else
         {
                 PlayerList[client].FromDatabase = true;
-        }
-}
-
-void SQLQueryUpdatePlayer(Database db, DBResultSet result, const char[] error, any data)
-{
-#if defined _DEBUG
-        LogMessage("SQLQueryUpdatePlayer");
-#endif
-        if (db == null || strlen(error) > 0)
-        {
-                LogError("SQLQueryUpdatePlayer error: %s", error);
         }
 }
 

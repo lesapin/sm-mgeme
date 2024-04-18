@@ -27,19 +27,21 @@
 
 #include <dbi>
 
+#define MGEME_DB "mgeme"
+
 Database gDB;
 
-bool DBConnect()
+stock bool DBConnect()
 {
         char error[255];
 
-        if (SQL_CheckConfig("mgeme"))
+        if (SQL_CheckConfig(MGEME_DB))
         {
-                gDB = SQL_Connect("mgeme", true, error, sizeof(error));
+                gDB = SQL_Connect(MGEME_DB, true, error, sizeof(error));
         }
         else
         {
-                LogMessage("Named DB configuration <mgeme> doesn't exist, using default config");
+                LogMessage("DB config <%s> doesn't exist, using default config", MGEME_DB);
                 gDB = SQL_DefConnect(error, sizeof(error));
         }
 
@@ -59,28 +61,21 @@ bool DBConnect()
                 return false;
         }
 
-        gDB.Query(SQLQueryCreateTable, "CREATE TABLE IF NOT EXISTS mgeme_stats (steamid TEXT, \
+        gDB.Query(SQLQueryErrorCheck, "CREATE TABLE IF NOT EXISTS mgeme_stats (steamid TEXT, \
         first_seen INTEGER, elo INTEGER, wins INTEGER, losses INTEGER)");
 
         return true;
 }
 
-bool DBCheckError()
+stock void DBInitServerStats()
 {
-        char error[255];
-
-        if (SQL_GetError(gDB, error, sizeof(error)))
-        {
-                LogError("Database error: %s", error);
-                return true;
-        }
-
-        return false;
+        gDB.Query(SQLQueryErrorCheck, "CREATE TABLE IF NOT EXISTS mgeme_server (steamid TEXT, \
+        date TEXT, playtime INTEGER, playtime_total INTEGER, connections INTEGER)");
 }
 
-void SQLQueryCreateTable(Database db, DBResultSet result, const char[] error, any data)
+stock void SQLQueryErrorCheck(Database db, DBResultSet result, const char[] error, any data)
 {
-        if (strlen(error) > 0)
+        if (db == null || strlen(error) > 0)
         {
                 LogError("SQLQueryCreateTable error: %s", error);
         }
