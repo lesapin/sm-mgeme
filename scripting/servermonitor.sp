@@ -24,7 +24,7 @@
 #include <signals>
 #include <mgeme/database>
 
-#define PLUGIN_VERSION "2.0.0"
+#define PLUGIN_VERSION "2.0.1"
 
 public Plugin myinfo = 
 {
@@ -256,11 +256,11 @@ Action DumpStats()
                         ActiveTime += (GetTime() - ActiveStart);
                 }
 
-                file.WriteLine("ACTIVETIME %i", ActiveTime);
+                file.WriteLine("MANHOURS %i", Playtime);
+                file.WriteLine("ACTIVEHOURS %i", ActiveTime);
                 file.WriteLine("MAXCLIENTS %i", MaxPlayers);
                 file.WriteLine("UNIQUECLIENTS %i", UniqueConnections);
                 file.WriteLine("CONNECTIONS %i", Connections);
-                file.WriteLine("MANHOURS %i", Playtime);
         }
 
         delete file;
