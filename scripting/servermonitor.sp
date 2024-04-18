@@ -24,7 +24,7 @@
 #include <signals>
 #include <mgeme/database>
 
-#define PLUGIN_VERSION "2.0.1"
+#define PLUGIN_VERSION "2.1.1"
 
 public Plugin myinfo = 
 {
@@ -49,9 +49,42 @@ public void OnPluginStart()
 {
         RegAdminCmd("serverstats", Admin_Command_ServerStats, 1, "Dump server stats and drop table.");
         
-        ActiveStart = 0;
         ActiveTime = 0;
-        MaxPlayers = 0;
+        MaxPlayers = GetClientCount();
+
+        char FilePath[256];
+        BuildPath(Path_SM, FilePath, sizeof(FilePath), "data/servermonitor.dat");
+        File file = OpenFile(FilePath, "r");
+
+        if (file)
+        {
+                int timestamp;
+                char Date[32], FileDate[32];
+
+                file.ReadInt32(timestamp);
+
+                FormatTime(Date, sizeof(Date), "%D", GetTime());
+                FormatTime(FileDate, sizeof(Date), "%D", timestamp);
+
+                if (strcmp(Date, FileDate) == 0)
+                {
+                        file.ReadInt32(MaxPlayers);
+                        file.ReadInt32(ActiveTime);
+                }
+        }
+        
+        delete file;
+        DeleteFile(FilePath);
+
+        if (GetClientCount() > 0)
+        {
+                ActiveStart = GetTime();
+        }
+        else
+        {
+                ActiveStart = 0;
+        }
+
 }
 
 public void OnConfigsExecuted()
@@ -113,6 +146,19 @@ public void OnPluginEnd()
                         }
                 }
         }
+
+        char FilePath[256];
+        BuildPath(Path_SM, FilePath, sizeof(FilePath), "data/servermonitor.dat");
+        File file = OpenFile(FilePath, "w");
+
+        if (file)
+        {
+                file.WriteInt32(GetTime());
+                file.WriteInt32(MaxPlayers);
+                file.WriteInt32(ActiveTime);
+        }
+        
+        delete file;
 }
 
 void UpdatePlayer(int client)
