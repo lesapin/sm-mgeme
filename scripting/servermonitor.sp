@@ -48,7 +48,20 @@ bool HasDB;
 public void OnPluginStart()
 {
         RegAdminCmd("serverstats", Admin_Command_ServerStats, 1, "Dump server stats and drop table.");
-        
+}
+
+public void OnConfigsExecuted()
+{
+        if ((HasDB = DBConnect()))
+        {
+                DBInitServerStats();
+                CreateHandler(USR1, DumpStats);
+        }
+        else
+        {
+                SetFailState("Couldn't connect to database");
+        }        
+
         ActiveTime = 0;
         MaxPlayers = GetClientCount();
 
@@ -83,20 +96,6 @@ public void OnPluginStart()
         else
         {
                 ActiveStart = 0;
-        }
-
-}
-
-public void OnConfigsExecuted()
-{
-        if ((HasDB = DBConnect()))
-        {
-                DBInitServerStats();
-                CreateHandler(USR1, DumpStats);
-        }
-        else
-        {
-                SetFailState("Couldn't connect to database");
         }
 }
 
