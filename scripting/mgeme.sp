@@ -612,7 +612,7 @@ int CalcEloChange(Arena arena)
         PrintToChatAll("Red expected score: %0.2f", RedExpectedScore);
         PrintToChatAll("Blu expected score: %0.2f", BluExpectedScore);
 #endif
-        float RedKFactor, BluKFactor;   // Variable K-factor.
+        float RedKFactor, BluKFactor; // Variable K-factor.
 
         if (arena.REDElo < 2100) RedKFactor = 16.0;
         else if (arena.REDElo <  2400) RedKFactor = 12.0;
@@ -622,7 +622,7 @@ int CalcEloChange(Arena arena)
         else if (arena.BLUElo < 2400) BluKFactor = 12.0;
         else BluKFactor = 8.0;
 
-        //float KFactor = 16.0;           // Universal K-factor.
+        //float KFactor = 16.0; // Universal K-factor.
         float KFactor = BluKFactor < RedKFactor ? BluKFactor : RedKFactor;
 
         // Handle early leavers.
@@ -637,16 +637,18 @@ int CalcEloChange(Arena arena)
                 BluFrags = arena.FragLimit;
         }
 
-        float NumRounds = (float(arena.REDScore) + float(arena.BLUScore)) / 1.5;
+        float NumRounds = (float(arena.REDScore) + float(arena.BLUScore)) / 1.3;
         float RedScore = float(RedFrags) / NumRounds;
         float BluScore = float(BluFrags) / NumRounds;
            
         // A negative rating change doesn't mean losing, it just means that
         // the player under-performed relative to their expected score.
-        return RoundToCeil(KFactor * FloatAbs(RedScore > BluScore ? 
+        int change = RoundToCeil(KFactor * FloatAbs(RedScore > BluScore ? 
                                              (RedScore - RedExpectedScore) :
                                              (BluScore - BluExpectedScore)
         ));
+
+        return change < 5 ? 5 : change;
 }
 
 /**
@@ -817,16 +819,10 @@ void UpdateHUD(Arena arena, int client, bool updateEverything = true, bool updat
                 {
                         DrawHUD(arena, hud, sizeof(hud));
                         arena.SetHUD(hud);
-#if defined _DEBUG
-                        PrintToChat(client, "set hud %s", hud);
-#endif
                 }
                 else
                 {
                         arena.GetHUD(hud, sizeof(hud));
-#if defined _DEBUG
-                        PrintToChat(client, "got hud %s", hud);
-#endif
                 }
 
                 if (updateScores) 
@@ -1182,7 +1178,7 @@ public Action Timer_Respawn(Handle timer, int serial)
         }
 
 
-        return Plugin_Stop;
+        return Plugin_Continue;
 }
 
 public Action Timer_UpdateHUDAfterRespawn(Handle timer, int serial)
@@ -1194,7 +1190,7 @@ public Action Timer_UpdateHUDAfterRespawn(Handle timer, int serial)
                 UpdateHUD(view_as<Arena>(view_as<Player>(client).ArenaIdx), client);
         }
 
-        return Plugin_Stop;
+        return Plugin_Continue;
 }
 
 public Action Timer_Match_Start(Handle timer, Arena arena)
@@ -1439,7 +1435,7 @@ public Action Event_PlayerSpawn_Post(Event ev, const char[] name, bool dontBroad
         _Player.ClipPrimary = Slot0 > -1 ? GetEntProp(Slot0, Prop_Data, "m_iClip1") : 0;
         _Player.ClipSecondary = Slot1 > -1 ? GetEntProp(Slot1, Prop_Data, "m_iClip1") : 0;
         
-        CreateTimer(0.8, Timer_UpdateHUDAfterRespawn, client);
+        CreateTimer(1.0, Timer_UpdateHUDAfterRespawn, client);
         //UpdateHUDNextFrame(client);
         //UpdateHUD(_Arena, client);
 
@@ -1632,7 +1628,7 @@ public Action Event_RoundWin_Post(Event ev, const char[] name, bool dontBroadcas
                 arena.BLUElo = arena.BLUElo / 2;
         }
 
-        CreateTimer(1.7, Timer_Match_End, arena);
+        CreateTimer(1.3, Timer_Match_End, arena);
 
         return Plugin_Handled;
 }
