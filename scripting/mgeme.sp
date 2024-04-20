@@ -161,6 +161,8 @@ public void OnClientPostAdminCheck(int client)
 
                 gDB.Query(SQLQueryOnAuth, Query, client);
         }
+        
+        TF2_ChangeClientTeam(client, TFTeam_Spectator);
 }
 
 public void OnClientDisconnect(int client)
@@ -381,6 +383,11 @@ Action Command_JoinClass(int client, const char[] cmd, int args)
 
 Action Command_Spectate(int client, const char[] cmd, int args)
 {
+        if (!IsValidEntity(client))
+        {
+                return Plugin_Handled;
+        }
+
         int PrevTarget = GetEntPropEnt(client, Prop_Send, "m_hObserverTarget");
         Player PrevSpectated = view_as<Player>(PrevTarget);
 
@@ -637,7 +644,7 @@ int CalcEloChange(Arena arena)
                 BluFrags = arena.FragLimit;
         }
 
-        float NumRounds = (float(arena.REDScore) + float(arena.BLUScore)) / 1.3;
+        float NumRounds = (float(arena.REDScore) + float(arena.BLUScore));// / 1.3;
         float RedScore = float(RedFrags) / NumRounds;
         float BluScore = float(BluFrags) / NumRounds;
            
@@ -873,7 +880,7 @@ void UpdateSpectatorHUDs(Arena arena)
                 }
                 else
                 {
-                        UpdateHUD(arena, Spectator, true);
+                        UpdateHUD(arena, Spectator, true, true);
                 }
         }
 
@@ -1038,7 +1045,7 @@ void SpectateNextFrame(int client)
         {
                 Arena SpecArena = view_as<Arena>(Spectated.ArenaIdx);
                 SpecArena.AddSpectator(client);
-                UpdateHUD(SpecArena, client);
+                UpdateHUD(SpecArena, client, true, true);
         }
         else
         {
@@ -1046,13 +1053,11 @@ void SpectateNextFrame(int client)
         }
 }
 
-/*
 void UpdateHUDNextFrame(int client)
 {
         Player _Player = view_as<Player>(client);
         UpdateHUD(view_as<Arena>(_Player.ArenaIdx), client);
 }
-*/
 
 /**
  * =============================================================================
@@ -1435,9 +1440,9 @@ public Action Event_PlayerSpawn_Post(Event ev, const char[] name, bool dontBroad
         _Player.ClipPrimary = Slot0 > -1 ? GetEntProp(Slot0, Prop_Data, "m_iClip1") : 0;
         _Player.ClipSecondary = Slot1 > -1 ? GetEntProp(Slot1, Prop_Data, "m_iClip1") : 0;
         
-        CreateTimer(1.0, Timer_UpdateHUDAfterRespawn, client);
+        CreateTimer(1.5, Timer_UpdateHUDAfterRespawn, client);
         //UpdateHUDNextFrame(client);
-        //UpdateHUD(_Arena, client);
+        UpdateHUD(_Arena, client);
 
         return Plugin_Continue;
 }
